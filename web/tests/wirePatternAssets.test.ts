@@ -14,6 +14,7 @@ import {
   resolveWirePatternVariation,
   wirePatternFamily,
   type WirePatternAsset,
+  WirePatternAssetCache,
   type WirePatternCatalog,
   type WirePatternFamily,
   type WirePatternSection,
@@ -52,6 +53,17 @@ function part(overrides: Partial<VisualPartInfo> = {}): VisualPartInfo {
 }
 
 describe("wire pattern assets", () => {
+  it("reports invalid assets without rejecting application startup", async () => {
+    const cache = new WirePatternAssetCache(
+      { "main/helix_1": "invalid.glb" },
+      async () => new THREE.Group()
+    );
+
+    await expect(cache.loadAll()).resolves.toEqual([
+      "main/helix_1: wire pattern contains no glTF LINES primitive"
+    ]);
+  });
+
   it("extracts only one non-branching LINES chain and ignores triangle face edges", () => {
     const root = new THREE.Group();
     const lineGeometry = new THREE.BufferGeometry();
@@ -69,20 +81,21 @@ describe("wire pattern assets", () => {
     expect(asset.sourceLength).toBe(2);
   });
 
-  it("ships start-origin main and connection assets for every family and serial variant", async () => {
+  it("ships seam-compatible assets for every family and serial variant", async () => {
     for (const [section, expectedLength] of [["main", 4], ["connection", 1]] as const) {
       for (const family of ["straight", "jitter", "helix"] as const) {
         const variants = await Promise.all([1, 2].map((variant) =>
           loadAsset(`${section}/${family}_${variant}`)));
         for (const asset of variants) {
-          expect(asset.minX).toBeCloseTo(0, 6);
-          expect(asset.maxX).toBeCloseTo(expectedLength, 6);
-          expect(asset.sourceLength).toBeCloseTo(expectedLength, 6);
+          expect(asset.sourceLength).toBeGreaterThan(0);
           expect(asset.points.length).toBeGreaterThanOrEqual(5);
-          expect(asset.points[0].y).toBeCloseTo(0, 7);
-          expect(asset.points[0].z).toBeCloseTo(0, 7);
-          expect(asset.points.at(-1)?.y).toBeCloseTo(0, 7);
-          expect(asset.points.at(-1)?.z).toBeCloseTo(0, 7);
+          expect(Math.abs(asset.points[0].y - (asset.points.at(-1)?.y ?? Number.NaN))).toBeLessThan(1e-6);
+          expect(Math.abs(asset.points[0].z - (asset.points.at(-1)?.z ?? Number.NaN))).toBeLessThan(1e-6);
+          if (family !== "helix") {
+            expect(asset.minX).toBeCloseTo(0, 6);
+            expect(asset.maxX).toBeCloseTo(expectedLength, 6);
+            expect(asset.sourceLength).toBeCloseTo(expectedLength, 6);
+          }
         }
         expect(variants[0].sourceLength).toBeCloseTo(variants[1].sourceLength, 7);
       }
@@ -126,7 +139,7 @@ describe("wire pattern assets", () => {
       curveEnd: sagLength,
       variant: 1,
       flipAroundLongitudinalAxis: false
-    }, 1);
+    });
     const middle = deformed.reduce((best, point) => Math.abs(point.x - 1.5) < Math.abs(best.x - 1.5) ? point : best);
     expect(middle.x).toBeCloseTo(1.5, 6);
     expect(middle.z).toBeCloseTo(-0.5, 6);
@@ -142,10 +155,10 @@ describe("wire pattern assets", () => {
     const curve = new Float64Array([0, 0, 0, 2, 0, 0]);
     const normal = deformWirePattern(asset, curve, {
       curveStart: 0, curveEnd: 2, variant: 1, flipAroundLongitudinalAxis: false
-    }, 1);
+    });
     const flipped = deformWirePattern(asset, curve, {
       curveStart: 0, curveEnd: 2, variant: 1, flipAroundLongitudinalAxis: true
-    }, 1);
+    });
     expect(flipped[0].toArray()).toEqual(normal[0].toArray());
     expect(flipped.at(-1)?.toArray()).toEqual(normal.at(-1)?.toArray());
     expect(flipped[1].x).toBeCloseTo(normal[1].x, 7);
@@ -153,7 +166,7 @@ describe("wire pattern assets", () => {
     expect(flipped[1].z).toBeCloseTo(-normal[1].z, 7);
   });
 
-  it("joins adjacent pieces and scales unit helix by the Core radius", async () => {
+  it("joins adjacent pieces and preserves authored helix offsets", async () => {
     const assets = new Map<string, WirePatternAsset>();
     for (const family of ["straight", "helix"] as const) {
       for (const variant of [1, 2] as const) {
@@ -172,15 +185,26 @@ describe("wire pattern assets", () => {
     expect(straight[0]).toBeCloseTo(0, 7);
     expect(straight.at(-3)).toBeCloseTo(8, 7);
 
-    const radius = 0.18;
+    const authoredRadius = 0.025;
+    const authoredHelix: WirePatternAsset = {
+      points: [
+        new THREE.Vector3(0, authoredRadius, 0),
+        new THREE.Vector3(1, 0, authoredRadius),
+        new THREE.Vector3(2, authoredRadius, 0)
+      ],
+      minX: 0,
+      maxX: 2,
+      sourceLength: 2
+    };
+    assets.set("main/helix_1", authoredHelix);
+    assets.set("main/helix_2", authoredHelix);
     const straightAxis = new Float64Array([0, 0, 0, 8, 0, 0]);
     const helix = materializeWirePattern(
-      part({ supplementalKind: 2, resolvedHelixRadius: radius }), straightAxis, "helix", catalog);
+      part({ supplementalKind: 2, resolvedHelixRadius: 0.18 }), straightAxis, "helix", catalog);
     let maxOffset = 0;
     for (let index = 0; index + 2 < helix.length; index += 3) {
       maxOffset = Math.max(maxOffset, Math.hypot(helix[index + 1], helix[index + 2]));
     }
-    expect(maxOffset).toBeGreaterThan(0.05);
-    expect(maxOffset).toBeLessThanOrEqual(radius + 1e-6);
+    expect(maxOffset).toBeCloseTo(authoredRadius, 6);
   });
 });

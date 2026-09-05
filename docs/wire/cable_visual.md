@@ -62,7 +62,7 @@ helixはCableSectionではなく、logical span単位で派生するidentityを�
 
 Core visual generationはWire curve semanticsを所有する。sag済み`VisualCurvePart.samples`、part kind / supplemental kind、boundary/tangent、wire radius、material/color、helixのresolved axis/radiusを派生出力とする。Coreは具体GLB、asset family、authoring length、piece、variant、visual flipを知らない。
 
-GLBのparseとglTF `LINES` primitiveの抽出、asset catalog/family mapping、実asset extentの計測、piece tiling、`partKey`由来のpresentation-only variantと長手軸180度flipはWeb asset adapter / render materializationが所有する。adapterはCoreの`VisualCurvePart.samples`をarc lengthで評価し、world-up基準frameへlocal X/Y/Zを機械的に写像する。sag、connection geometry、material、wire radiusを再判断せず、triangle faceのedgeをwire centerlineとして解釈しない。helixの局所巻き形状とtessellationはGLB、axisとresolved radiusはCoreだけが決定する。`VisualModelInstance`はrigid model用のままとし、deformable cableをその経路へ押し込まない。
+GLBのparseとglTF `LINES` primitiveの抽出、asset catalog/family mapping、実asset extentの計測、piece tiling、`partKey`由来のpresentation-only variantと長手軸180度flipはWeb asset adapter / render materializationが所有する。adapterはCoreの`VisualCurvePart.samples`をarc lengthで評価し、world-up基準frameへlocal X/Y/Zを機械的に写像する。sag、connection geometry、material、wire radiusを再判断せず、triangle faceのedgeをwire centerlineとして解釈しない。helixの局所巻き形状、半径を含むasset local offset、tessellationはGLBのauthored寸法をそのまま使い、Coreは配置axisとcontainmentのresolved radiusを決定する。`VisualModelInstance`はrigid model用のままとし、deformable cableをその経路へ押し込まない。
 
 ## Forbidden implementations
 

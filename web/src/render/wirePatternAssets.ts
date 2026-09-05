@@ -36,6 +36,8 @@ export interface WirePatternCatalog {
   asset(section: WirePatternSection, family: WirePatternFamily, variant: WirePatternVariant): WirePatternAsset;
 }
 
+type WirePatternSceneLoader = (url: string) => Promise<THREE.Object3D>;
+
 const wirePatternUrls: Readonly<Record<string, string>> = {
   "connection/helix_1": connectionHelix1Url,
   "connection/helix_2": connectionHelix2Url,
@@ -115,19 +117,37 @@ export function extractLooseEdgeChain(root: THREE.Object3D): WirePatternAsset {
 export class WirePatternAssetCache implements WirePatternCatalog {
   private readonly loaded = new Map<string, WirePatternAsset>();
 
-  async loadAll(): Promise<void> {
-    await Promise.all(Object.entries(wirePatternUrls).map(async ([key, url]) => {
-      this.loaded.set(key, extractLooseEdgeChain(await loadGltfScene(url)));
-    }));
+  constructor(
+    private readonly urls: Readonly<Record<string, string>> = wirePatternUrls,
+    private readonly loadScene: WirePatternSceneLoader = loadGltfScene
+  ) {}
+
+  async loadAll(): Promise<string[]> {
+    this.loaded.clear();
+    const failures = (await Promise.all(Object.entries(this.urls).map(async ([key, url]) => {
+      try {
+        this.loaded.set(key, extractLooseEdgeChain(await this.loadScene(url)));
+        return null;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return `${key}: ${message}`;
+      }
+    }))).filter((failure): failure is string => failure !== null);
     for (const section of ["main", "connection"] as const) {
       for (const family of ["straight", "jitter", "helix"] as const) {
-        const first = this.asset(section, family, 1);
-        const second = this.asset(section, family, 2);
+        const firstKey = assetKey(section, family, 1);
+        const secondKey = assetKey(section, family, 2);
+        const first = this.loaded.get(firstKey);
+        const second = this.loaded.get(secondKey);
+        if (first === undefined || second === undefined) continue;
         if (Math.abs(first.sourceLength - second.sourceLength) > 1e-6) {
-          throw new Error(`wire pattern variants have different source extents: ${section}/${family}`);
+          failures.push(`${section}/${family}: wire pattern variants have different source extents`);
+          this.loaded.delete(firstKey);
+          this.loaded.delete(secondKey);
         }
       }
     }
+    return failures;
   }
 
   asset(section: WirePatternSection, family: WirePatternFamily, variant: WirePatternVariant): WirePatternAsset {
@@ -216,8 +236,7 @@ export function wirePatternFamily(part: VisualPartInfo): WirePatternFamily {
 export function deformWirePattern(
   asset: WirePatternAsset,
   coreSamples: Float64Array,
-  piece: WirePatternPiece,
-  localOffsetScale: number
+  piece: WirePatternPiece
 ): THREE.Vector3[] {
   const table = curveTable(coreSamples);
   if (piece.curveEnd - piece.curveStart > asset.sourceLength + 1e-9) {
@@ -237,8 +256,8 @@ export function deformWirePattern(
     const up = sampled.tangent.clone().cross(lateral).normalize();
     const sign = piece.flipAroundLongitudinalAxis ? -1 : 1;
     return sampled.point
-      .addScaledVector(lateral, authored.y * localOffsetScale * sign)
-      .addScaledVector(up, authored.z * localOffsetScale * sign);
+      .addScaledVector(lateral, authored.y * sign)
+      .addScaledVector(up, authored.z * sign);
   });
 }
 
@@ -252,10 +271,9 @@ export function materializeWirePattern(
   const section = wirePatternSection(part.kind);
   const sourceLength = cache.asset(section, family, 1).sourceLength;
   const pieces = planWirePatternPieces(table.total, sourceLength, part.partKey, family);
-  const localOffsetScale = family === "helix" ? part.resolvedHelixRadius : 1;
   const result: number[] = [];
   for (const piece of pieces) {
-    const deformed = deformWirePattern(cache.asset(section, family, piece.variant), coreSamples, piece, localOffsetScale);
+    const deformed = deformWirePattern(cache.asset(section, family, piece.variant), coreSamples, piece);
     for (let index = 0; index < deformed.length; index += 1) {
       const point = deformed[index];
       const previousOffset = result.length - 3;

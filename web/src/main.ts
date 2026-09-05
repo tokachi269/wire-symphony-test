@@ -24,7 +24,7 @@ const mountTarget = target;
 async function main(): Promise<void> {
   const store = new ViewerStore();
   const stopConsoleLogging = startConsoleLogging(store);
-  const [modelBootstrap] = await Promise.all([
+  const [modelBootstrap, wirePatternFailures] = await Promise.all([
     loadDefaultModelBootstrap(),
     wirePatternAssetCache.loadAll()
   ]);
@@ -76,6 +76,9 @@ async function main(): Promise<void> {
   );
   actions.initialize();
   await actions.restoreWorkspace();
+  if (wirePatternFailures.length > 0) {
+    store.setError(`Wire pattern asset load failed: ${wirePatternFailures.join("; ")}`);
+  }
   const scene = new WireScene(
     store,
     (point, pick) => actions.addViewportPoint(point, pick),
