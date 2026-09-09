@@ -2,10 +2,10 @@
 tracker:
   kind: github
   provider:
-    repo: "tokachi269/wire"
+    repo: "tokachi269/wire-symphony-test"
     token: $GITHUB_TOKEN
   required_labels:
-    - symphony-test
+    - symphony-luna
   active_states:
     - open
   terminal_states:
@@ -24,7 +24,7 @@ agent:
   max_turns: 10
   max_retry_backoff_ms: 300000
 codex:
-  command: "codex --config shell_environment_policy.inherit=all app-server"
+  command: "codex --model gpt-5.6-luna --config model_reasoning_effort=max --config shell_environment_policy.inherit=all app-server"
   approval_policy:
     reject:
       sandbox_approval: true
@@ -68,4 +68,4 @@ Descriptionは未記載。
 
 最終報告には、観測したこと、変更内容、検証結果、commit hash、残る不確実性またはblockerを簡潔に含める。
 
-GitHub操作が利用できる場合、完了またはblockedの要約を現在のIssueへ1回だけ記録し、再実行を止めるため `symphony-test` ラベルを外す。Issueはcloseしない。ほかのIssue、PR、ラベルには触れない。
+GitHub操作が利用できる場合、完了またはblockedの要約を現在のIssueへ1回だけ記録し、再実行を止めるため `symphony-luna` ラベルを外す。Issueはcloseしない。ほかのIssue、PR、ラベルには触れない。

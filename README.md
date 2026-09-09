@@ -20,8 +20,9 @@ viewerは不足したtopologyやplacementを推測しない。
 4. [testing](docs/testing.md)
 5. [portable agent engineering harness](docs/engineering/agent_harness.md)
 6. [command cheatsheet](docs/command_cheatsheet.md)
-7. [wire documents](docs/wire/README.md)
-8. [road documents](docs/road/README.md)
+7. [Symphony sandbox operations](docs/engineering/symphony.md)
+8. [wire documents](docs/wire/README.md)
+9. [road documents](docs/road/README.md)
 
 ## Quick check
 
