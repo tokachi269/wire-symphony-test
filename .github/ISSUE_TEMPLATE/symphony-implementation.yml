@@ -1,13 +1,12 @@
-name: Symphony implementation
-description: Luna Maxに隔離workspaceで実装と検証を任せる
-title: "[Symphony] "
-labels:
-  - symphony-luna
+name: Agent implementation
+description: 隔離workspaceで実装・検証・独立レビューまで実行する
+title: "[Agent implement] "
+labels: []
 body:
   - type: markdown
     attributes:
       value: |
-        このIssueはLuna Maxの実装キューに入ります。未決定事項を実装させず、1 Issueを独立して検証できる大きさにしてください。
+        OWNER、MEMBER、COLLABORATORがこのフォームから登録したIssueだけが、自動的に実装キューへ入ります。未決定事項を実装させず、1 Issueを独立して検証できる大きさにしてください。
   - type: textarea
     id: goal
     attributes:

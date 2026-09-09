@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
-    [ValidateSet("luna", "sol")]
-    [string]$Mode = "luna"
+    [ValidateSet("implement", "review")]
+    [string]$Mode = "implement"
 )
 
 $ErrorActionPreference = "Stop"
@@ -12,12 +12,12 @@ if ([string]::IsNullOrWhiteSpace($env:GITHUB_TOKEN)) {
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $symphonyRoot = "D:\GitHub\symphony\elixir"
-$workflow = if ($Mode -eq "sol") {
-    Join-Path $repoRoot "WORKFLOW.sol-review.md"
+$workflow = if ($Mode -eq "review") {
+    Join-Path $repoRoot "WORKFLOW.review.md"
 } else {
     Join-Path $repoRoot "WORKFLOW.md"
 }
-$port = if ($Mode -eq "sol") { 4001 } else { 4000 }
+$port = if ($Mode -eq "review") { 4001 } else { 4000 }
 $logsRoot = Join-Path "D:\GitHub\wire-symphony-logs" $Mode
 
 if (-not (Test-Path -LiteralPath $symphonyRoot -PathType Container)) {
