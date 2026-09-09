@@ -1,0 +1,134 @@
+name: CI and delivery
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  architecture:
+    name: Architecture contracts and observation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out full history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.13"
+      - name: Test architecture tooling
+        run: |
+          python tools/harness/test_architecture_lint.py
+          python tools/harness/test_architecture_observation.py
+          python tools/test_arch_lint.py
+      - name: Enforce architecture contracts
+        run: |
+          python tools/arch_lint.py
+          python tools/test_family_lint.py
+      - name: Generate review-only architecture reports
+        run: |
+          mkdir -p artifacts/architecture
+          python tools/architecture_observation.py graph --format markdown --output artifacts/architecture/graph.md
+          python tools/architecture_observation.py history --window-commits 50 --format markdown --output artifacts/architecture/cochange.md
+          python tools/architecture_observation.py history --window-commits 50 --format json --output artifacts/architecture/cochange.json
+      - name: Upload architecture reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: architecture-observation
+          path: artifacts/architecture
+          if-no-files-found: warn
+          retention-days: 14
+
+  core:
+    name: C++ core
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.13"
+      - name: Configure
+        run: >-
+          cmake -S . -B build-ci -G Ninja
+          -DCMAKE_BUILD_TYPE=Debug
+          -DWIRE_BUILD_VIEWER=OFF
+          -DWIRE_ENABLE_FORMAT_TARGETS=OFF
+          -DWIRE_ENABLE_CLANG_TIDY_TARGETS=OFF
+          -DWIRE_ENABLE_UML_TARGETS=OFF
+      - name: Build tests
+        run: cmake --build build-ci --parallel
+      - name: Run tests
+        run: ctest --test-dir build-ci --output-on-failure
+
+  web:
+    name: Web and WASM
+    needs: [architecture, core]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Set up Emscripten
+        uses: emscripten-core/setup-emsdk@667eb33f24e84e7f362c16d8d7fff0629a73e15e # v15
+        with:
+          version: 5.0.1
+          actions-cache-folder: emsdk-cache
+      - name: Install dependencies
+        working-directory: web
+        run: npm ci
+      - name: Type-check
+        working-directory: web
+        run: npm run check
+      - name: Build WASM
+        shell: bash
+        run: |
+          WIRE_BUILD_SOURCE_HASH=$(node web/scripts/wasm-source-hash.mjs)
+          WIRE_BUILD_VERSION=$(node -p "require('./web/package.json').version")
+          emcmake cmake -S web/wasm -B web/wasm/build-ci -G Ninja \
+            -DBUILD_TESTING=OFF \
+            -DWIRE_ENABLE_PCH=OFF \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_EXE_LINKER_FLAGS_RELEASE=-O3 \
+            -DWIRE_BUILD_SOURCE_HASH="$WIRE_BUILD_SOURCE_HASH" \
+            -DWIRE_BUILD_VERSION="$WIRE_BUILD_VERSION"
+          cmake --build web/wasm/build-ci --target wire_web_core --parallel
+          echo "$WIRE_BUILD_SOURCE_HASH" > web/src/wasm-generated/source-hash.txt
+      - name: Test web integration
+        working-directory: web
+        run: npm test
+      - name: Build web package
+        working-directory: web
+        run: npx vite build
+      - name: Upload delivery artifact
+        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: wire-web-${{ github.sha }}
+          path: web/dist
+          if-no-files-found: error
+          retention-days: 30

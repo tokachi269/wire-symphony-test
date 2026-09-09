@@ -42,6 +42,12 @@ python tools\test_family_lint.py
 git diff --check
 ```
 
+## CI / delivery
+
+`.github/workflows/ci.yml`はpush、pull request、手動実行でarchitecture contract、Core、Web/WASMを検証する。co-change/DSMはartifactとして保存するが、その数値は合否条件にしない。
+
+タグpushまたは手動実行では、検証後の`web/dist`もGitHub Actions artifactとして保存する。公開先は未定義なので、自動deployは行わない。
+
 ## Architecture observation
 
 `graph`のdefault scopeはproduction sourceである。`--scope tests`または`--scope tools`で別scopeを確認できる。DSM、co-change、hotspotの数値はreview sensorでありquality gateではない。Reflexionのdivergence判定は既存architecture lintを再利用する。
