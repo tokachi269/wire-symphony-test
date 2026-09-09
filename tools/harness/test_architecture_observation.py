@@ -215,13 +215,88 @@ class ArchitectureObservationTest(unittest.TestCase):
         self.assertEqual([{"sha": "mass", "production_files": 3}], window["mass_change_commits"])
         pair = window["module_cochange_exclusive"][0]
         self.assertFalse(pair["static_relation"])
+        self.assertEqual("unreachable", pair["static_distance"])
+        self.assertIsNone(pair["static_path_left_to_right"])
+        self.assertIsNone(pair["static_path_right_to_left"])
         self.assertEqual(2, pair["cochange_commits"])
         self.assertEqual(1.0, pair["support"])
         self.assertEqual(
             pair,
-            window["module_cochange_without_static_dependency"][0],
+            window["module_cochange_without_direct_static_edge"][0],
         )
         self.assertIn("first parent", report["history_model"])
+
+    def test_history_reports_indirect_static_distance(self) -> None:
+        classified = {
+            "viewer/src/view.cpp": "viewer",
+            "domains/wire/include/public.hpp": "wire_public_api",
+            "domains/wire/src/state.cpp": "wire_state_internal",
+        }
+        when = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        commits = [
+            CommitChange(
+                "c1",
+                when,
+                frozenset({"viewer/src/view.cpp", "domains/wire/src/state.cpp"}),
+                0,
+            )
+        ]
+        graph = {
+            "edges": [],
+            "aggregate_edges": [
+                {"source": "viewer/viewer", "target": "wire/wire_public_api"},
+                {"source": "wire/wire_public_api", "target": "wire/wire_state_internal"},
+            ],
+        }
+
+        report = history_report(commits, classified, graph, window_commits=1)
+        pair = report["windows"]["recent_commits"]["module_cochange_exclusive"][0]
+
+        self.assertFalse(pair["static_relation"])
+        self.assertEqual(2, pair["static_path_left_to_right"])
+        self.assertIsNone(pair["static_path_right_to_left"])
+        self.assertEqual("1_intermediate", pair["static_distance"])
+
+    def test_history_compares_recent_and_previous_equal_commit_windows(self) -> None:
+        classified = {
+            "domains/road/src/a.cpp": "road_a",
+            "domains/road/src/a2.cpp": "road_a",
+            "viewer/src/b.cpp": "viewer_b",
+        }
+        when = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        both = frozenset({"domains/road/src/a.cpp", "viewer/src/b.cpp"})
+        left_only = frozenset(
+            {"domains/road/src/a.cpp", "domains/road/src/a2.cpp"}
+        )
+        commits = [
+            CommitChange("recent-1", when, both, 0),
+            CommitChange("recent-2", when, both, 0),
+            CommitChange("previous-1", when, both, 0),
+            CommitChange("previous-2", when, left_only, 0),
+        ]
+
+        report = history_report(
+            commits,
+            classified,
+            {"edges": [], "aggregate_edges": []},
+            window_commits=2,
+        )
+
+        self.assertEqual(
+            ["previous-1", "previous-2"],
+            report["windows"]["previous_commits"]["commit_shas"],
+        )
+        self.assertEqual(
+            ["recent-1", "recent-2"],
+            report["windows"]["recent_commits"]["commit_shas"],
+        )
+        trend = report["module_cochange_strengthening"][0]
+        self.assertEqual(1, trend["previous_cochange_commits"])
+        self.assertEqual(2, trend["recent_cochange_commits"])
+        self.assertAlmostEqual(0.5, trend["support_delta"])
+        self.assertAlmostEqual(0.5, trend["confidence_left_to_right_delta"])
+        self.assertAlmostEqual(0.0, trend["confidence_right_to_left_delta"])
+        self.assertEqual("unreachable", trend["static_distance"])
 
     def test_numstat_rename_is_attributed_to_current_path(self) -> None:
         text = (
@@ -253,6 +328,19 @@ class ArchitectureObservationTest(unittest.TestCase):
         )
         for command in ("graph", "reflexion", "delta", "history", "hotspot"):
             self.assertIn(command, result.stdout)
+        history_help = subprocess.run(
+            [
+                sys.executable,
+                str(REPOSITORY_ROOT / "tools" / "architecture_observation.py"),
+                "history",
+                "--help",
+            ],
+            cwd=REPOSITORY_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        self.assertIn("--window-commits", history_help.stdout)
 
 
 if __name__ == "__main__":

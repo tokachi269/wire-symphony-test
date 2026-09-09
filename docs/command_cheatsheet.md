@@ -51,11 +51,14 @@ python tools\architecture_observation.py graph --format markdown
 python tools\architecture_observation.py graph --scope tests --format markdown
 python tools\architecture_observation.py reflexion --base <task-start-sha> --format markdown
 python tools\architecture_observation.py delta --base <task-start-sha> --format markdown
-python tools\architecture_observation.py history --recent-days 180 --format markdown
+python tools\architecture_observation.py history --window-commits 50 --format markdown
+python tools\architecture_observation.py history --window-commits 50 --recent-days 30 --format markdown
 python tools\architecture_observation.py hotspot --format markdown
 ```
 
 `reflexion`は包括的なallowed-dependency graphを仮定せず、既存required/forbidden contract、既存lint結果、unmodeled relationを分けて表示する。`delta`は自動確定できるstructural factsとhuman review candidatesを分離し、pathやtokenからsemantics変更を断定しない。`history`はfirst-parent chain上で各commitをfirst parentとの差分として一度だけ数え、mass-changeをinclusive/exclusiveで表示する。
+
+`history`の既定比較は、最新50 commitsとその直前50 commitsである。`recently strengthened`は両期間のsupportと方向別confidenceの差分を示すが、増加自体を問題とは判定しない。静的関係はdirectの有無だけでなく、両方向の最短dependency pathを`direct`、`1_intermediate`、`2_intermediates`、`3_plus_intermediates`、`unreachable`に分ける。`without a direct static edge`は間接依存まで存在しないという意味ではない。`--recent-days`は日数窓も併記したい場合だけ指定する。
 
 ## clang-tidy
 

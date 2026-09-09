@@ -8,7 +8,7 @@ project's existing architecture manifest, and compares snapshots and history.
 
 from __future__ import annotations
 
-from collections import Counter, defaultdict
+from collections import Counter, defaultdict, deque
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 import itertools
@@ -587,13 +587,63 @@ def annotate_production_counts(
     ]
 
 
+def _shortest_path_edges(
+    relations: set[tuple[str, str]], source: str, target: str
+) -> int | None:
+    if source == target:
+        return 0
+    adjacency: dict[str, set[str]] = defaultdict(set)
+    for left, right in relations:
+        adjacency[left].add(right)
+    pending = deque([(source, 0)])
+    visited = {source}
+    while pending:
+        current, distance = pending.popleft()
+        for next_node in sorted(adjacency.get(current, ())):
+            if next_node == target:
+                return distance + 1
+            if next_node not in visited:
+                visited.add(next_node)
+                pending.append((next_node, distance + 1))
+    return None
+
+
+def _static_distance_fields(
+    left: str, right: str, relations: set[tuple[str, str]]
+) -> dict[str, object]:
+    left_to_right = _shortest_path_edges(relations, left, right)
+    right_to_left = _shortest_path_edges(relations, right, left)
+    reachable = [
+        distance
+        for distance in (left_to_right, right_to_left)
+        if distance is not None
+    ]
+    nearest = min(reachable) if reachable else None
+    if nearest is None:
+        label = "unreachable"
+    elif nearest == 1:
+        label = "direct"
+    elif nearest == 2:
+        label = "1_intermediate"
+    elif nearest == 3:
+        label = "2_intermediates"
+    else:
+        label = "3_plus_intermediates"
+    return {
+        "static_relation": nearest == 1,
+        "static_distance": label,
+        "static_path_left_to_right": left_to_right,
+        "static_path_right_to_left": right_to_left,
+    }
+
+
 def cochange_rows(
     commits: Sequence[CommitChange],
     unit_of: Callable[[str], str | None],
     *,
     excluded_shas: set[str] | None = None,
     static_relations: set[tuple[str, str]] | None = None,
-    limit: int = 50,
+    limit: int | None = 50,
 ) -> list[dict[str, object]]:
     excluded_shas = excluded_shas or set()
     static_relations = static_relations or set()
@@ -608,7 +658,9 @@ def cochange_rows(
             touches[unit] += 1
         for left, right in itertools.combinations(units, 2):
             pairs[(left, right)] += 1
-    ranked = sorted(pairs.items(), key=lambda item: (-item[1], item[0]))[:limit]
+    ranked = sorted(pairs.items(), key=lambda item: (-item[1], item[0]))
+    if limit is not None:
+        ranked = ranked[:limit]
     return [
         {
             "left": left,
@@ -617,12 +669,99 @@ def cochange_rows(
             "support": count / analyzed_commit_count if analyzed_commit_count else 0.0,
             "confidence_left_to_right": count / touches[left],
             "confidence_right_to_left": count / touches[right],
-            "static_relation": (
-                (left, right) in static_relations or (right, left) in static_relations
-            ),
+            **_static_distance_fields(left, right, static_relations),
         }
         for (left, right), count in ranked
     ]
+
+
+def cochange_strengthening_rows(
+    previous_commits: Sequence[CommitChange],
+    recent_commits: Sequence[CommitChange],
+    unit_of: Callable[[str], str | None],
+    *,
+    previous_excluded_shas: set[str] | None = None,
+    recent_excluded_shas: set[str] | None = None,
+    static_relations: set[tuple[str, str]] | None = None,
+    limit: int = 50,
+) -> list[dict[str, object]]:
+    static_relations = static_relations or set()
+    previous = {
+        (str(row["left"]), str(row["right"])): row
+        for row in cochange_rows(
+            previous_commits,
+            unit_of,
+            excluded_shas=previous_excluded_shas,
+            static_relations=static_relations,
+            limit=None,
+        )
+    }
+    recent = {
+        (str(row["left"]), str(row["right"])): row
+        for row in cochange_rows(
+            recent_commits,
+            unit_of,
+            excluded_shas=recent_excluded_shas,
+            static_relations=static_relations,
+            limit=None,
+        )
+    }
+    rows: list[dict[str, object]] = []
+    for left, right in sorted(previous.keys() | recent.keys()):
+        before = previous.get((left, right), {})
+        after = recent.get((left, right), {})
+        support_delta = float(after.get("support", 0.0)) - float(
+            before.get("support", 0.0)
+        )
+        left_delta = float(after.get("confidence_left_to_right", 0.0)) - float(
+            before.get("confidence_left_to_right", 0.0)
+        )
+        right_delta = float(after.get("confidence_right_to_left", 0.0)) - float(
+            before.get("confidence_right_to_left", 0.0)
+        )
+        if max(support_delta, left_delta, right_delta) <= 0.0:
+            continue
+        rows.append(
+            {
+                "left": left,
+                "right": right,
+                "previous_cochange_commits": int(
+                    before.get("cochange_commits", 0)
+                ),
+                "recent_cochange_commits": int(after.get("cochange_commits", 0)),
+                "previous_support": float(before.get("support", 0.0)),
+                "recent_support": float(after.get("support", 0.0)),
+                "support_delta": support_delta,
+                "previous_confidence_left_to_right": float(
+                    before.get("confidence_left_to_right", 0.0)
+                ),
+                "recent_confidence_left_to_right": float(
+                    after.get("confidence_left_to_right", 0.0)
+                ),
+                "confidence_left_to_right_delta": left_delta,
+                "previous_confidence_right_to_left": float(
+                    before.get("confidence_right_to_left", 0.0)
+                ),
+                "recent_confidence_right_to_left": float(
+                    after.get("confidence_right_to_left", 0.0)
+                ),
+                "confidence_right_to_left_delta": right_delta,
+                **_static_distance_fields(left, right, static_relations),
+            }
+        )
+    return sorted(
+        rows,
+        key=lambda row: (
+            -float(row["support_delta"]),
+            -max(
+                float(row["confidence_left_to_right_delta"]),
+                float(row["confidence_right_to_left_delta"]),
+            ),
+            -int(row["recent_cochange_commits"]),
+            str(row["left"]),
+            str(row["right"]),
+        ),
+    )[:limit]
 
 
 def history_report(
@@ -630,12 +769,14 @@ def history_report(
     classified: Mapping[str, str],
     graph: Mapping[str, object],
     *,
-    recent_days: int = 180,
+    recent_days: int | None = None,
+    window_commits: int = 50,
     limit: int = 50,
 ) -> dict[str, object]:
+    if window_commits <= 0:
+        raise ValueError("window_commits must be positive")
     annotated = annotate_production_counts(commits, classified)
     newest = max((commit.committed_at for commit in annotated), default=datetime.min)
-    recent_cutoff = newest - timedelta(days=recent_days)
     static_file = {
         (str(edge["source"]), str(edge["target"])) for edge in graph.get("edges", [])
     }
@@ -654,17 +795,32 @@ def history_report(
             return None
         return aggregate_key(domain_of(path), layer)
 
-    windows: dict[str, object] = {}
-    for name, selected in (
+    recent_commits = annotated[:window_commits]
+    previous_commits = annotated[window_commits : window_commits * 2]
+    selections: list[tuple[str, Sequence[CommitChange]]] = [
         ("long_term", annotated),
-        ("recent", [commit for commit in annotated if commit.committed_at >= recent_cutoff]),
-    ):
+        ("previous_commits", previous_commits),
+        ("recent_commits", recent_commits),
+    ]
+    if recent_days is not None:
+        recent_cutoff = newest - timedelta(days=recent_days)
+        selections.append(
+            (
+                "recent_days",
+                [commit for commit in annotated if commit.committed_at >= recent_cutoff],
+            )
+        )
+
+    windows: dict[str, object] = {}
+    excluded_by_window: dict[str, set[str]] = {}
+    for name, selected in selections:
         cutoff = _percentile(
             [commit.production_file_count for commit in selected], 0.99
         )
         mass = {
             commit.sha for commit in selected if commit.production_file_count > cutoff
         }
+        excluded_by_window[name] = mass
         file_inclusive = cochange_rows(
             selected, file_unit, static_relations=static_file, limit=limit
         )
@@ -687,6 +843,7 @@ def history_report(
         )
         windows[name] = {
             "commit_count": len(selected),
+            "commit_shas": [commit.sha for commit in selected],
             "mass_change_rule": "production file count > p99 within this window",
             "mass_change_p99": cutoff,
             "mass_change_commits": [
@@ -698,10 +855,10 @@ def history_report(
             "file_cochange_exclusive": file_exclusive,
             "module_cochange_inclusive": module_inclusive,
             "module_cochange_exclusive": module_exclusive,
-            "file_cochange_without_static_dependency": [
+            "file_cochange_without_direct_static_edge": [
                 row for row in file_exclusive if not row["static_relation"]
             ],
-            "module_cochange_without_static_dependency": [
+            "module_cochange_without_direct_static_edge": [
                 row for row in module_exclusive if not row["static_relation"]
             ],
         }
@@ -710,8 +867,22 @@ def history_report(
             "Each change set is the commit diff against its first parent on the first-parent chain. "
             "Merge commits are counted once, so merged branch commits are not counted again."
         ),
+        "trend_model": (
+            "Recently strengthened co-change compares equal-sized adjacent first-parent commit "
+            "windows. Deltas are review evidence, not defect claims or quality gates."
+        ),
         "recent_days": recent_days,
+        "window_commits": window_commits,
         "windows": windows,
+        "module_cochange_strengthening": cochange_strengthening_rows(
+            previous_commits,
+            recent_commits,
+            module_unit,
+            previous_excluded_shas=excluded_by_window["previous_commits"],
+            recent_excluded_shas=excluded_by_window["recent_commits"],
+            static_relations=static_module,
+            limit=limit,
+        ),
     }
 
 
@@ -1024,7 +1195,37 @@ def history_markdown(report: Mapping[str, object]) -> str:
         "",
         str(report.get("history_model", "")),
         "",
+        str(report.get("trend_model", "")),
+        "",
+        (
+            "Static distance is the shortest directed dependency path in either direction. "
+            "`1_intermediate` means two dependency edges; `unreachable` means no path was extracted."
+        ),
+        "",
     ]
+    trends = list(report.get("module_cochange_strengthening", []))
+    lines.extend(["## Recently strengthened module co-change", ""])
+    if not trends:
+        lines.extend(["None.", ""])
+    else:
+        lines.append(
+            "| Left | Right | Commits previous→recent | Δ support | Δ L→R | Δ R→L | Static distance | Static L→R / R→L |"
+        )
+        lines.append("|---|---|---:|---:|---:|---:|---|---|")
+        for row in trends:
+            left_path = row.get("static_path_left_to_right")
+            right_path = row.get("static_path_right_to_left")
+            lines.append(
+                f"| {row['left']} | {row['right']} | "
+                f"{row['previous_cochange_commits']}→{row['recent_cochange_commits']} | "
+                f"{row['support_delta']:+.3f} | "
+                f"{row['confidence_left_to_right_delta']:+.3f} | "
+                f"{row['confidence_right_to_left_delta']:+.3f} | "
+                f"{row['static_distance']} | "
+                f"{left_path if left_path is not None else 'unreachable'} / "
+                f"{right_path if right_path is not None else 'unreachable'} |"
+            )
+        lines.append("")
     windows = report.get("windows", {})
     if not isinstance(windows, Mapping):
         return "\n".join(lines)
@@ -1054,8 +1255,8 @@ def history_markdown(report: Mapping[str, object]) -> str:
             ("Module co-change inclusive", "module_cochange_inclusive"),
             ("Module co-change mass-change exclusive", "module_cochange_exclusive"),
             (
-                "Module co-change without a static dependency",
-                "module_cochange_without_static_dependency",
+                "Module co-change without a direct static edge",
+                "module_cochange_without_direct_static_edge",
             ),
         ):
             lines.extend([f"### {title}", ""])
@@ -1063,15 +1264,21 @@ def history_markdown(report: Mapping[str, object]) -> str:
             if not rows:
                 lines.append("None.")
             else:
-                lines.append("| Left | Right | Commits | Support | L→R | R→L | Static |")
-                lines.append("|---|---|---:|---:|---:|---:|---|")
+                lines.append(
+                    "| Left | Right | Commits | Support | L→R | R→L | Static distance | Static L→R / R→L |"
+                )
+                lines.append("|---|---|---:|---:|---:|---:|---|---|")
                 for row in rows:
+                    left_path = row.get("static_path_left_to_right")
+                    right_path = row.get("static_path_right_to_left")
                     lines.append(
                         f"| {row['left']} | {row['right']} | {row['cochange_commits']} | "
                         f"{row['support']:.3f} | "
                         f"{row['confidence_left_to_right']:.3f} | "
                         f"{row['confidence_right_to_left']:.3f} | "
-                        f"{'yes' if row['static_relation'] else 'no'} |"
+                        f"{row['static_distance']} | "
+                        f"{left_path if left_path is not None else 'unreachable'} / "
+                        f"{right_path if right_path is not None else 'unreachable'} |"
                     )
             lines.append("")
     lines.extend(["## Sensor retirement", "", sensor_retirement_note(), ""])

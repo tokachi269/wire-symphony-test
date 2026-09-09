@@ -228,7 +228,17 @@ def main() -> int:
     common("reflexion", base=True)
     common("delta", base=True)
     history_parser = common("history")
-    history_parser.add_argument("--recent-days", type=int, default=180)
+    history_parser.add_argument(
+        "--window-commits",
+        type=int,
+        default=50,
+        help="compare the newest N first-parent commits with the preceding N (default: 50)",
+    )
+    history_parser.add_argument(
+        "--recent-days",
+        type=int,
+        help="also report an optional day-based recent window",
+    )
     history_parser.add_argument("--limit", type=int, default=50)
     hotspot_parser = common("hotspot")
     hotspot_parser.add_argument("--limit", type=int, default=50)
@@ -280,7 +290,8 @@ def main() -> int:
         commits,
         classified,
         current_graph,
-        recent_days=getattr(args, "recent_days", 180),
+        recent_days=getattr(args, "recent_days", None),
+        window_commits=getattr(args, "window_commits", 50),
         limit=args.limit,
     )
     if args.command == "history":
