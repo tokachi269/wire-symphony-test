@@ -1,0 +1,61 @@
+name: Agent goal
+description: 1つの目的を最大3つの子Issueへ分解し、同じworkspaceで順次実行する
+title: "[Agent goal] "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        OWNER、MEMBER、COLLABORATORがこのフォームを送信すると、Goal agentが最大3つの子Issueを作成し、同じworkspaceで順次実装・検証・独立レビューします。
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: 全子タスクの完了後に成立している状態を具体的に書く
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Current evidence
+      description: 現状、再現結果、関連commit、対象ファイルなど確認済みの事実を書く
+    validations:
+      required: true
+  - type: textarea
+    id: success
+    attributes:
+      label: Success criteria
+      description: Goal全体の完了条件をチェック可能な形で書く
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: agentが子Issueへ分解してよい領域を書く
+    validations:
+      required: true
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: Out of scope
+      description: 変更してはいけない領域、判断、外部操作を書く
+    validations:
+      required: true
+  - type: textarea
+    id: references
+    attributes:
+      label: Canonical references
+      description: architecture、operation semantics、testing文書を指定する
+      placeholder: |
+        docs/architecture.md
+        docs/testing.md
+    validations:
+      required: true
+  - type: checkboxes
+    id: authorize_children
+    attributes:
+      label: Child issue authorization
+      options:
+        - label: I authorize this agent to create and execute up to three depth-1 child issues inside the scope above.
+          required: true
