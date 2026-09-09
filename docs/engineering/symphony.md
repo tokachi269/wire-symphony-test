@@ -6,21 +6,23 @@ Symphonyは`tokachi269/wire-symphony-test`のIssueだけを監視し、`D:/GitHu
 
 | Label | Model | Purpose | Write access | Max turns |
 |---|---|---|---|---:|
-| `agent:run` | `gpt-5.6-luna` / `max` | dispatch gate for implementation and Goal issues | isolated workspace only | 10 |
-| `agent:implement` | none | classify a single implementation Issue | follows `agent:run` | none |
-| `agent:goal` | none | classify a Goal that owns up to three sequential child Issues | follows `agent:run` | none |
-| `agent:child` | none | child tracked and executed by its parent Goal agent; never dispatches | parent workspace only | none |
+| `agent:run` | none | dispatch gate paired with `agent:implement` | follows implementation workflow | none |
+| `agent:implement` | `gpt-5.6-luna` / `max` | scoped implementation, verification, independent review | isolated workspace only | 10 |
+| `agent:investigate` | `gpt-5.6-luna` / `max` | read-only repository investigation and evidence-based Issue decomposition | repository read-only; scoped Issue writes | 4 |
+| `agent:proposed` | none | generated Issue requiring a decision or dependency resolution | none | none |
 | `agent:review` | configured review model (`gpt-5.6-sol` / `high` initially) | standalone design or review | read-only | 2 |
 | `agent:blocked` | none | operator attention; never dispatches | none | none |
 
-実装queueでは`agent:run`に`agent:implement`または`agent:goal`のどちらか1つを組み合わせる。`agent:child`は親Goalの同じworkspaceで処理し、単独dispatchしない。通常実装では親agentだけが変更し、強いモデルのsubagentは定義済みの停止条件に当たった診断と、commit後の独立reviewに限定する。review modelを変更するときはIssueラベルではなくworkflowの1か所だけを更新する。
+実装queueでは`agent:run`と`agent:implement`を組み合わせる。調査は`agent:investigate`だけでread-only実行する。実装Issueは原則として新Issueを作らず、調査workflowだけが根拠に基づくIssue分解を担当する。強いモデルのsubagentは定義済みの停止条件に当たった診断、複雑な調査判断、commit後の独立reviewに限定する。review modelを変更するときはIssueラベルではなくworkflowの1か所だけを更新する。
+
+調査workflowのfilesystemはread-onlyだが、Symphonyの`github_api`はIssue作成・コメント・ラベル操作に使える。workflowは許可操作を現在の調査Issueとそこから生成するIssueに限定する。ただしこれはagentへの実行契約であり、Symphony本体のREST path allowlistではない。強制境界は、fine-grained tokenをこの実験repoだけに限定し、Contentsをread-only、Issuesをread/writeにすることで作る。
 
 ## Before starting
 
-1. `D:/GitHub/wire-symphony-test`の`WORKFLOW.md`と`WORKFLOW.review.md`が意図したbranchにあることを確認する。
+1. `D:/GitHub/wire-symphony-test`の`WORKFLOW.md`、`WORKFLOW.investigate.md`、`WORKFLOW.review.md`が意図したbranchにあることを確認する。
 2. GitHubのfine-grained tokenをPowerShellの`GITHUB_TOKEN`へ設定する。対象repoは`wire-symphony-test`だけに絞り、Issuesをread/writeにする。tokenをrepoやworkflowへ書かない。
 3. `codex login status`が成功することを確認する。
-4. GitHub Issueフォームから、単独実装、Goal、standalone reviewのいずれか1つを作る。OWNER、MEMBER、COLLABORATORがフォームを送信するとrouting workflowが対応ラベルを自動付与する。外部ユーザーのIssueは自動実行しない。
+4. GitHub Issueフォームから、調査、単独実装、standalone reviewのいずれか1つを作る。OWNER、MEMBER、COLLABORATORがフォームを送信するとrouting workflowが対応ラベルを自動付与する。外部ユーザーのIssueは自動実行しない。
 
 ## Start
 
@@ -31,25 +33,33 @@ Set-Location D:\GitHub\wire-symphony-test
 .\tools\start_symphony.ps1 implement
 ```
 
-standalone reviewは別terminalで必要なときだけ起動する。通常の実装後reviewは実装agentが別セッションのsubagentを起動するため、こちらを起動する必要はない。
+調査queueは別terminalで起動する。
+
+```powershell
+Set-Location D:\GitHub\wire-symphony-test
+.\tools\start_symphony.ps1 investigate
+```
+
+standalone reviewは必要なときだけ起動する。通常の実装後reviewは実装agentが別セッションのsubagentを起動するため、こちらを起動する必要はない。
 
 ```powershell
 Set-Location D:\GitHub\wire-symphony-test
 .\tools\start_symphony.ps1 review
 ```
 
-dashboardは実装queueが`http://localhost:4000/`、standalone review queueが`http://localhost:4001/`である。
+dashboardは実装queueが`http://localhost:4000/`、調査queueが`http://localhost:4001/`、standalone review queueが`http://localhost:4002/`である。
 
 ## Issue lifecycle
 
-1. 信頼済みユーザーが単独実装またはGoalのIssueフォームを送信すると、GitHub Actionsが`agent:run`と種別ラベルを付け、Symphonyが取得する。手動でラベルを付ける必要はない。
-2. 実装agentはIssueごとの隔離workspaceで変更・検証し、local commitを作る。pushと本体変更は行わない。
-3. commit後、別セッションのreviewer subagentが`docs/engineering/review_policy.md`に従い完全なdiffをread-onlyでreviewする。
-4. findingがあれば実装agentが修正・再検証・commitし、reviewerが再確認する。
-5. Goalでは最大3つの`agent:child` Issueを作成し、同じworkspaceで1件ずつ実装・reviewする。完了した子Issueは結果とcommitを記録してcloseする。子Issueは別workerへdispatchしない。
-6. review完了またはblockedの要約が親Issueへ記録され、`agent:run`が外れる。blockedなら`agent:blocked`が付く。親Issueは自動closeしない。
-7. 帰宅後にIssue記載のworkspaceとcommitを確認する。採用するcommitだけを`wire-symphony-test`へcherry-pickしてCIを通す。
-8. 実験結果が良ければ、同じcommitを本体`D:/GitHub/wire`へcherry-pickする。
+1. 信頼済みユーザーが調査フォームを送信すると、GitHub Actionsが`agent:investigate`を付け、read-only調査が始まる。
+2. 調査agentは確認済みevidenceからIssueを分解する。フォームで自動実行を許可した場合、独立して安全に実装できるIssueだけ`[Agent implement]`で作成し、自動queueへ入れる。依存または未決定事項があるものは`agent:proposed`に留める。
+3. 信頼済みユーザーが単独実装フォームを送信した場合も、GitHub Actionsが`agent:run`と`agent:implement`を付ける。手動ラベル操作は不要である。
+4. 実装agentはIssueごとの隔離workspaceで変更・検証し、local commitを作る。pushと本体変更は行わない。
+5. commit後、別セッションのreviewer subagentが`docs/engineering/review_policy.md`に従い完全なdiffをread-onlyでreviewする。
+6. findingがあれば実装agentが修正・再検証・commitし、reviewerが再確認する。
+7. review完了またはblockedの要約がIssueへ記録され、`agent:run`が外れる。blockedなら`agent:blocked`が付く。Issueは自動closeしない。
+8. 帰宅後にIssue記載のworkspaceとcommitを確認する。採用するcommitだけを`wire-symphony-test`へcherry-pickしてCIを通す。
+9. 実験結果が良ければ、同じcommitを本体`D:/GitHub/wire`へcherry-pickする。
 
 通常のpost-implementation reviewに別Issueは作らない。既存commitの単独auditや実装前設計だけをstandalone review Issueとして登録する。
 

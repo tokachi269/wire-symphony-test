@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet("implement", "review")]
+    [ValidateSet("implement", "investigate", "review")]
     [string]$Mode = "implement"
 )
 
@@ -12,12 +12,16 @@ if ([string]::IsNullOrWhiteSpace($env:GITHUB_TOKEN)) {
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $symphonyRoot = "D:\GitHub\symphony\elixir"
-$workflow = if ($Mode -eq "review") {
-    Join-Path $repoRoot "WORKFLOW.review.md"
-} else {
-    Join-Path $repoRoot "WORKFLOW.md"
+$workflow = switch ($Mode) {
+    "investigate" { Join-Path $repoRoot "WORKFLOW.investigate.md" }
+    "review" { Join-Path $repoRoot "WORKFLOW.review.md" }
+    default { Join-Path $repoRoot "WORKFLOW.md" }
 }
-$port = if ($Mode -eq "review") { 4001 } else { 4000 }
+$port = switch ($Mode) {
+    "investigate" { 4001 }
+    "review" { 4002 }
+    default { 4000 }
+}
 $logsRoot = Join-Path "D:\GitHub\wire-symphony-logs" $Mode
 
 if (-not (Test-Path -LiteralPath $symphonyRoot -PathType Container)) {
