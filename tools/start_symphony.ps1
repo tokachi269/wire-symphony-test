@@ -50,6 +50,28 @@ function Resolve-GitBashExecutable {
     throw "Git for Windows bash.exe was not found under $gitRoot."
 }
 
+function Assert-SymphonyPortsAvailable {
+    param([int[]]$Ports)
+
+    $occupied = foreach ($portNumber in $Ports) {
+        foreach ($listener in @(Get-NetTCPConnection -State Listen -LocalPort $portNumber -ErrorAction SilentlyContinue)) {
+            $process = Get-Process -Id $listener.OwningProcess -ErrorAction SilentlyContinue
+            [pscustomobject]@{
+                Port = $portNumber
+                Pid = $listener.OwningProcess
+                Process = if ($null -ne $process) { $process.ProcessName } else { "unknown" }
+            }
+        }
+    }
+
+    if (@($occupied).Count -gt 0) {
+        $details = ($occupied | ForEach-Object {
+            "port $($_.Port) (PID $($_.Pid), $($_.Process))"
+        }) -join "; "
+        throw "A Symphony dashboard port is already in use: $details. Stop the existing queue before starting another launcher."
+    }
+}
+
 if ([string]::IsNullOrWhiteSpace($env:GITHUB_TOKEN)) {
     throw "GITHUB_TOKEN is required. Use a repo-scoped fine-grained token with Issues, Contents, and Pull requests read/write permission."
 }
@@ -108,6 +130,8 @@ $env:GCM_INTERACTIVE = "Never"
 $env:SYMPHONY_CODEX_PATH = $codexPath.Replace("\", "/")
 
 if ($Mode -eq "all") {
+    Assert-SymphonyPortsAvailable -Ports @(4000, 4001, 4002, 4003)
+
     $powershellPath = (Get-Process -Id $PID).Path
     $launcherLogs = Join-Path $logsRootBase "launcher"
     New-Item -ItemType Directory -Force -Path $launcherLogs | Out-Null
@@ -175,6 +199,8 @@ $port = switch ($Mode) {
     default { 4000 }
 }
 $logsRoot = Join-Path $logsRootBase $Mode
+
+Assert-SymphonyPortsAvailable -Ports @($port)
 
 if (-not (Test-Path -LiteralPath $symphonyRoot -PathType Container)) {
     throw "Symphony checkout not found: $symphonyRoot"
