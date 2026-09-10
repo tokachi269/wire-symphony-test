@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet("all", "implement", "investigate", "review")]
+    [ValidateSet("all", "implement", "investigate", "decision", "review")]
     [string]$Mode = "all",
     [string]$RoutineModel = "gpt-5.6-luna",
     [string]$UpperModel = "gpt-5.6-sol",
@@ -112,12 +112,17 @@ if ($Mode -eq "all") {
     $launcherLogs = Join-Path $logsRootBase "launcher"
     New-Item -ItemType Directory -Force -Path $launcherLogs | Out-Null
 
-    $children = foreach ($childMode in @("implement", "investigate", "review")) {
+    $children = foreach ($childMode in @("implement", "investigate", "decision", "review")) {
         $stdout = Join-Path $launcherLogs "$childMode.stdout.log"
         $stderr = Join-Path $launcherLogs "$childMode.stderr.log"
         $process = Start-Process `
             -FilePath $powershellPath `
-            -ArgumentList @("-NoProfile", "-File", $PSCommandPath, $childMode, "-AcknowledgePreviewRisk") `
+            -ArgumentList @(
+                "-NoProfile", "-File", $PSCommandPath, $childMode,
+                "-RoutineModel", $RoutineModel,
+                "-UpperModel", $UpperModel,
+                "-AcknowledgePreviewRisk"
+            ) `
             -WindowStyle Hidden `
             -RedirectStandardOutput $stdout `
             -RedirectStandardError $stderr `
@@ -128,10 +133,10 @@ if ($Mode -eq "all") {
         }
     }
 
-    Write-Host "Symphony implement, investigation, and review queues started."
+    Write-Host "Symphony implement, investigation, decision, and review queues started."
     Write-Host "Routine model: $env:SYMPHONY_ROUTINE_MODEL ($env:SYMPHONY_ROUTINE_EFFORT)"
     Write-Host "Upper model:   $env:SYMPHONY_UPPER_MODEL ($env:SYMPHONY_UPPER_EFFORT)"
-    Write-Host "Dashboards: http://localhost:4000/, http://localhost:4001/, and http://localhost:4002/"
+    Write-Host "Dashboards: implement 4000, investigate 4001, review 4002, decision 4003"
     Write-Host "Logs: $launcherLogs"
     Write-Host "Keep this terminal open. Press Ctrl+C to stop all queues."
 
@@ -159,11 +164,13 @@ if ($Mode -eq "all") {
 
 $workflow = switch ($Mode) {
     "investigate" { Join-Path $repoRoot "WORKFLOW.investigate.md" }
+    "decision" { Join-Path $repoRoot "WORKFLOW.decision.md" }
     "review" { Join-Path $repoRoot "WORKFLOW.review.md" }
     default { Join-Path $repoRoot "WORKFLOW.md" }
 }
 $port = switch ($Mode) {
     "investigate" { 4001 }
+    "decision" { 4003 }
     "review" { 4002 }
     default { 4000 }
 }

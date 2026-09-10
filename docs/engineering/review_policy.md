@@ -6,14 +6,15 @@
 
 - 実装を行った親agentとは別セッションでreviewする。
 - reviewerはread-onlyとし、tracked fileの変更、commit、Issue操作を行わない。Serenaが生成するignored local index/cacheはproduct差分ではないが、commitしてはならない。
-- 実装者の説明だけでなく、Issue、Draft PR、変更前base commit、完全なdiff、現在のHEAD、検証出力を直接確認する。
+- 実装者の説明だけでなく、IssueのImplementation brief、Draft PR、変更前base commit、完全なdiff、現在のHEAD、検証出力を直接確認する。
+- briefとの不一致を先に確認し、問題をゼロから解き直す探索は不一致、未定義入力、または重大な残余riskを確認した場合に限る。
 - 通常reviewは実装会話を参照してよい。architecture、security、persistence、外部入力、権限境界を変える場合は、可能なら実装理由を先に与えずdiffと正本文書から確認する。
 
 ## Review order
 
 1. Acceptance: Issueの受け入れ条件を満たし、範囲外変更を含まないか。
 2. Correctness: failure path、境界値、state transition、error propagationを含めてbehaviorが成立するか。
-3. Architecture: decision owner、authority、dependency方向、operation semanticsを守り、第二の判定やspecial pathを増やしていないか。
+3. Architecture: briefで確定したdecision owner、authority、dependency方向、operation semanticsを守り、第二の判定やspecial pathを増やしていないか。
 4. Regression proof: `docs/testing.md`に沿うfocused proofがあり、testの削除・弱体化・skip・実装詳細への過結合がないか。
 5. Security: Issue本文などの外部入力、secret、権限、network、shell command、pathのscopeが拡大していないか。
 6. Performance and scale: hot path、計算量、allocation、I/O、buildまたはtest時間に説明不能な悪化がないか。

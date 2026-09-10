@@ -69,7 +69,7 @@ Issue本文の`Generated issue handling`に従う。
 
 - `Report only; do not create issues`: 調査結果だけを現在のIssueへ記録し、新Issueを作らない。
 - `Create proposed issues without running them`: 作成Issueへ`agent:proposed`だけを付ける。
-- `Create and queue independent issues automatically`: 未決定事項や別の生成Issueへの依存がなく、現在のbaseから独立して実装・検証できるIssueだけ、`[Agent implement]`タイトルで作成する。routing workflowが`agent:run`と`agent:implement`を付ける。依存または未決定事項があるIssueは`agent:proposed`に留める。
+- `Create and queue independent issues automatically`: owner、invariant、禁止事項、受け入れ条件、focused verificationまで確定できたIssueだけ、`[Agent planned]`タイトルで作成する。routing workflowが`agent:run`、`agent:implement`、`agent:planned`を付ける。security、persistence、外部入力、権限境界、authority変更、複数domain、または残余不確実性がある場合だけ`agent:review-required`も付ける。依存または未決定事項があるIssueは`agent:proposed`に留める。
 
 新Issueを作る前に、open/closed両方の既存Issueを検索し、重複を作らない。各Issueはファイル単位ではなく、同じdecision owner、受け入れ条件、検証方法で完了する変更単位とする。
 
@@ -82,6 +82,9 @@ Issue本文の`Generated issue handling`に従う。
 - Scope and out of scope
 - Canonical references
 - Dependencies or `None`
+- Decision owner
+- Invariants and forbidden changes
+- Post-implementation upper review: required / not required と理由
 
 1調査で作成できるIssueは最大20件とする。20件を超える候補がある場合、雑に切り分けずfamilyまたはphaseへ分類し、作成済み件数、未作成分類、次に必要な調査を報告する。生成Issueから孫Issueを作るよう指示しない。
 

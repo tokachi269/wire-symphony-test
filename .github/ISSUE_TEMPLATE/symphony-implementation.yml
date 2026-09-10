@@ -1,12 +1,12 @@
 name: Agent implementation
-description: 隔離workspaceで実装・検証し、Draft PRを独立レビューへ渡す
+description: 隔離workspaceでroute・実装・検証し、必要な場合だけ上位レビューへ渡す
 title: "[Agent implement] "
 labels: []
 body:
   - type: markdown
     attributes:
       value: |
-        OWNER、MEMBER、COLLABORATORがこのフォームから登録したIssueだけが、自動的に実装キューへ入ります。未決定事項を実装させず、1 Issueを独立して検証できる大きさにしてください。
+        OWNER、MEMBER、COLLABORATORがこのフォームから登録したIssueだけが、自動的に実装キューへ入ります。Lunaが変更前に判断コストを分類し、必要な場合だけSolのdecision queueへ渡します。
   - type: textarea
     id: goal
     attributes:
@@ -29,7 +29,7 @@ body:
       placeholder: |
         - [ ] focused testがfail-firstからpassになる
         - [ ] 関連する既存testがpassする
-        - [ ] Draft PRが作成され、独立レビューへ渡される
+        - [ ] Draft PRが作成され、必要な場合だけ上位レビューへ渡される
     validations:
       required: true
   - type: textarea

@@ -47,12 +47,12 @@ Descriptionは未記載。
 
 ## 制約
 
-1. 最初に `AGENTS.md`、`docs/engineering/review_policy.md`、Issueと紐付くDraft PR、指定された正本文書を読む。実装workspaceが存在する場合はそのbaseからHEADまでの完全なdiffを直接確認する。
+1. 最初に `AGENTS.md`、`docs/engineering/review_policy.md`、Issueの`Implementation brief`、Issueと紐付くDraft PR、指定された正本文書を読む。実装workspaceが存在する場合はそのbaseからHEADまでの完全なdiffを直接確認する。
 2. tracked fileの変更、commit、push、deploy、releaseは禁止する。Serenaが生成するignored local metadata以外は作成せず、調査と評価だけを行う。
 3. Issueの問いに直接答え、事実、推論、未確認事項を分ける。範囲外の再設計を提案しない。
 4. 設計依頼では、決定事項、未決定事項、owner、影響範囲、受け入れ条件、実装Issueへ渡す具体的な指示をまとめる。
-5. レビュー依頼では `docs/engineering/review_policy.md` に従い、PR全体を重大度順のfindingsとして示す。問題がなければ、確認したdiff、検証、残るriskを明記する。
+5. レビュー依頼ではゼロから実装問題を解き直さず、briefのowner、allowed change、invariant、禁止事項、受け入れ条件とdiffの不一致を先に確認する。必要な場合だけ関連コードへ探索を広げる。
 
 ## 完了報告
 
-結果をDraft PRと現在のIssueへ1回ずつ記録する。actionable findingがある場合は`agent:review`を外してから`agent:run`を付け、同じworkspaceを実装queueへ戻す。findingがない場合は`agent:review`を外して`agent:ready`を付ける。判断不能の場合は`agent:review`を外して`agent:blocked`を付ける。Issueはcloseせず、PRをready化またはmergeしない。ほかのIssue、PR、ラベルには触れない。
+結果をDraft PRと現在のIssueへ1回ずつ記録する。trial用にupper model role、finding有無、修正roundを含める。actionable findingがある場合は`agent:review`を外してから`agent:run`を付け、同じworkspaceを実装queueへ戻す。findingがない場合は`agent:review`を外して`agent:ready`を付ける。判断不能の場合は`agent:review`を外して`agent:blocked`を付ける。`agent:review-required`は監査記録として残す。Issueはcloseせず、PRをready化またはmergeしない。ほかのIssue、PR、ラベルには触れない。

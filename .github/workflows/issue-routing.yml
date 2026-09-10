@@ -14,22 +14,29 @@ jobs:
       (github.event.issue.author_association == 'OWNER' ||
        github.event.issue.author_association == 'MEMBER' ||
        github.event.issue.author_association == 'COLLABORATOR') &&
-      startsWith(github.event.issue.title, '[Agent implement]')
+      (startsWith(github.event.issue.title, '[Agent implement]') ||
+       startsWith(github.event.issue.title, '[Agent planned]'))
     runs-on: ubuntu-latest
     steps:
       - name: Add implementation queue label
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
         run: |
           set -euo pipefail
+          if [[ "${ISSUE_TITLE}" == "[Agent planned]"* ]]; then
+            LABELS='{"labels":["agent:run","agent:implement","agent:planned"]}'
+          else
+            LABELS='{"labels":["agent:run","agent:implement"]}'
+          fi
           curl --fail-with-body --silent --show-error \
             --request POST \
             --header "Accept: application/vnd.github+json" \
             --header "Authorization: Bearer ${GH_TOKEN}" \
             --header "X-GitHub-Api-Version: 2022-11-28" \
             --url "https://api.github.com/repos/${GITHUB_REPOSITORY}/issues/${ISSUE_NUMBER}/labels" \
-            --data '{"labels":["agent:run","agent:implement"]}'
+            --data "${LABELS}"
 
   investigation:
     if: >-
