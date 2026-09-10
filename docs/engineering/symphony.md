@@ -10,7 +10,7 @@ Symphonyは`tokachi269/wire-symphony-test`のIssueだけを監視し、`D:/GitHu
 | `agent:implement` | routine model (`gpt-5.6-luna` / `max` initially) | scoped implementation, verification, and Draft PR creation | isolated workspace and experiment remote | 3 |
 | `agent:investigate` | upper model (`gpt-5.6-sol` / `medium` initially) | read-only repository investigation and evidence-based Issue decomposition | repository read-only; scoped Issue writes | 4 |
 | `agent:proposed` | none | generated Issue requiring a decision or dependency resolution | none | none |
-| `agent:review` | upper model (`gpt-5.6-sol` / `medium` initially) | standalone design or review | read-only | 2 |
+| `agent:review` | upper model (`gpt-5.6-sol` / `medium` initially) | standalone design or review | read-only | 1 |
 | `agent:working` | none | implementation currently active | none | none |
 | `agent:ready` | none | independent review passed; human decision pending | none | none |
 | `agent:blocked` | none | operator attention; never dispatches | none | none |
@@ -45,7 +45,7 @@ launcherは`codex.exe`をPATHから探し、見つからない場合はCodex app
 
 実装queueだけはCodexの`permissions.symphony-codex` profileを使う。このprofileはworkspace直下とその`.git`だけを書き込み可能にし、GitHub API、git push、必要なlocal bindのためnetworkを許可する。`danger-full-access`は使わない。調査とreview queueはread-only sandboxのままとする。
 
-Serenaはユーザー環境へ`uv tool install -p 3.13 serena-agent`で導入し、`serena setup codex`で`--project-from-cwd`のMCPとして登録する。launcherは`%USERPROFILE%\.local\bin`をPATHへ追加し、Serenaが見つからない場合は起動を止める。
+Serenaはユーザー環境へ`uv tool install -p 3.13 serena-agent`で導入し、`serena setup codex`で`--project-from-cwd`のMCPとして登録する。launcherは`%USERPROFILE%\.local\bin`をPATHへ追加し、Serenaが見つからない場合は起動を止める。review queueだけはMCP引数を`--mode=planning`で上書きし、Serenaの編集toolを無効化する。Serenaがworkspaceに生成する`.serena/`はlocal index/cacheとしてignoreし、PRへ含めない。
 
 モデルを更新するときは、起動時の`-UpperModel <model-id>`または`-RoutineModel <model-id>`だけを変える。
 

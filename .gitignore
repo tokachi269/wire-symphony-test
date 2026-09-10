@@ -28,3 +28,4 @@ cmake_abi_probe.exe
 web/dev-*.log
 __pycache__/
 *.pyc
+.serena/

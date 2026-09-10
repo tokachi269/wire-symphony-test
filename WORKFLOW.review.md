@@ -21,10 +21,10 @@ hooks:
   timeout_ms: 120000
 agent:
   max_concurrent_agents: 1
-  max_turns: 2
+  max_turns: 1
   max_retry_backoff_ms: 300000
 codex:
-  command: '"${SYMPHONY_CODEX_PATH:-codex}" --model ${SYMPHONY_UPPER_MODEL:-gpt-5.6-sol} --config model_reasoning_effort=${SYMPHONY_UPPER_EFFORT:-medium} --config shell_environment_policy.inherit=all app-server'
+  command: '"${SYMPHONY_CODEX_PATH:-codex}" --model ${SYMPHONY_UPPER_MODEL:-gpt-5.6-sol} --config model_reasoning_effort=${SYMPHONY_UPPER_EFFORT:-medium} --config "mcp_servers.serena.args=[''start-mcp-server'',''--context=codex'',''--mode=planning'',''--project-from-cwd'']" --config shell_environment_policy.inherit=all app-server'
   approval_policy: never
   thread_sandbox: read-only
   turn_sandbox_policy:
@@ -48,7 +48,7 @@ Descriptionは未記載。
 ## 制約
 
 1. 最初に `AGENTS.md`、`docs/engineering/review_policy.md`、Issueと紐付くDraft PR、指定された正本文書を読む。実装workspaceが存在する場合はそのbaseからHEADまでの完全なdiffを直接確認する。
-2. ファイル変更、commit、push、deploy、releaseは禁止する。調査と評価だけを行う。
+2. tracked fileの変更、commit、push、deploy、releaseは禁止する。Serenaが生成するignored local metadata以外は作成せず、調査と評価だけを行う。
 3. Issueの問いに直接答え、事実、推論、未確認事項を分ける。範囲外の再設計を提案しない。
 4. 設計依頼では、決定事項、未決定事項、owner、影響範囲、受け入れ条件、実装Issueへ渡す具体的な指示をまとめる。
 5. レビュー依頼では `docs/engineering/review_policy.md` に従い、PR全体を重大度順のfindingsとして示す。問題がなければ、確認したdiff、検証、残るriskを明記する。

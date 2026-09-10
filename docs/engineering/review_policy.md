@@ -5,7 +5,7 @@
 ## Independence
 
 - 実装を行った親agentとは別セッションでreviewする。
-- reviewerはread-onlyとし、ファイル変更、commit、Issue操作を行わない。
+- reviewerはread-onlyとし、tracked fileの変更、commit、Issue操作を行わない。Serenaが生成するignored local index/cacheはproduct差分ではないが、commitしてはならない。
 - 実装者の説明だけでなく、Issue、Draft PR、変更前base commit、完全なdiff、現在のHEAD、検証出力を直接確認する。
 - 通常reviewは実装会話を参照してよい。architecture、security、persistence、外部入力、権限境界を変える場合は、可能なら実装理由を先に与えずdiffと正本文書から確認する。
 
