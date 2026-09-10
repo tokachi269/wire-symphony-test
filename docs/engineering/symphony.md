@@ -34,10 +34,12 @@ Symphonyは`tokachi269/wire-symphony-test`のIssueだけを監視し、`D:/GitHu
 
 ```powershell
 Set-Location D:\GitHub\wire-symphony-test
-.\tools\start_symphony.ps1 all
+.\tools\start_symphony.ps1 all -AcknowledgePreviewRisk
 ```
 
-terminalを開いたままにし、停止時は`Ctrl+C`を押す。dashboardは実装queueが`http://localhost:4000/`、調査queueが`http://localhost:4001/`である。
+`-AcknowledgePreviewRisk`は、Symphony engineering previewが通常のguardrailなしで動くことへの明示確認である。terminalを開いたままにし、停止時は`Ctrl+C`を押す。dashboardは実装queueが`http://localhost:4000/`、調査queueが`http://localhost:4001/`である。
+
+launcherは`codex.exe`をPATHから探し、見つからない場合はCodex appの`%LOCALAPPDATA%\OpenAI\Codex\bin`から最新版を解決して、hidden child processとSymphonyへ絶対パスで渡す。Symphony内部のshellにはWSLの`bash.exe`ではなくGit for Windowsの`bash.exe`を使う。
 
 モデルを更新するときは、起動時の`-UpperModel <model-id>`または`-RoutineModel <model-id>`だけを変える。
 
@@ -45,7 +47,7 @@ terminalを開いたままにし、停止時は`Ctrl+C`を押す。dashboardは�
 
 ```powershell
 Set-Location D:\GitHub\wire-symphony-test
-.\tools\start_symphony.ps1 review
+.\tools\start_symphony.ps1 review -AcknowledgePreviewRisk
 ```
 
 standalone review queueのdashboardは`http://localhost:4002/`である。
