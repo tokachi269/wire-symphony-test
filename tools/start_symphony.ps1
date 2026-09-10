@@ -2,8 +2,8 @@
 param(
     [ValidateSet("all", "implement", "investigate", "review")]
     [string]$Mode = "all",
-    [string]$RoutineModel = "",
-    [string]$UpperModel = "",
+    [string]$RoutineModel = "gpt-5.6-luna",
+    [string]$UpperModel = "gpt-5.6-sol",
     [switch]$AcknowledgePreviewRisk
 )
 
@@ -57,17 +57,8 @@ if (-not $AcknowledgePreviewRisk) {
     throw "Symphony requires explicit acknowledgement that this engineering preview runs without the usual guardrails. Re-run with -AcknowledgePreviewRisk."
 }
 
-if (-not [string]::IsNullOrWhiteSpace($RoutineModel)) {
-    $env:SYMPHONY_ROUTINE_MODEL = $RoutineModel
-} elseif ([string]::IsNullOrWhiteSpace($env:SYMPHONY_ROUTINE_MODEL)) {
-    $env:SYMPHONY_ROUTINE_MODEL = "gpt-5.6-luna"
-}
-
-if (-not [string]::IsNullOrWhiteSpace($UpperModel)) {
-    $env:SYMPHONY_UPPER_MODEL = $UpperModel
-} elseif ([string]::IsNullOrWhiteSpace($env:SYMPHONY_UPPER_MODEL)) {
-    $env:SYMPHONY_UPPER_MODEL = "gpt-5.6-sol"
-}
+$env:SYMPHONY_ROUTINE_MODEL = $RoutineModel
+$env:SYMPHONY_UPPER_MODEL = $UpperModel
 
 if ([string]::IsNullOrWhiteSpace($env:SYMPHONY_ROUTINE_EFFORT)) {
     $env:SYMPHONY_ROUTINE_EFFORT = "max"
@@ -77,7 +68,30 @@ if ([string]::IsNullOrWhiteSpace($env:SYMPHONY_UPPER_EFFORT)) {
 }
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$symphonyRoot = "D:\GitHub\symphony\elixir"
+$defaultSiblingRoot = Split-Path -Parent $repoRoot
+$symphonyRoot = if ([string]::IsNullOrWhiteSpace($env:SYMPHONY_ROOT)) {
+    Join-Path $defaultSiblingRoot "symphony\elixir"
+} else {
+    $env:SYMPHONY_ROOT
+}
+$workspaceRoot = if ([string]::IsNullOrWhiteSpace($env:SYMPHONY_WORKSPACE_ROOT)) {
+    Join-Path $defaultSiblingRoot "wire-symphony-workspaces"
+} else {
+    $env:SYMPHONY_WORKSPACE_ROOT
+}
+$logsRootBase = if ([string]::IsNullOrWhiteSpace($env:SYMPHONY_LOGS_ROOT)) {
+    Join-Path $defaultSiblingRoot "wire-symphony-logs"
+} else {
+    $env:SYMPHONY_LOGS_ROOT
+}
+$env:SYMPHONY_ROOT = (Resolve-Path -LiteralPath $symphonyRoot).Path
+$resolvedWorkspaceRoot = Resolve-Path -LiteralPath $workspaceRoot -ErrorAction SilentlyContinue
+if ($null -ne $resolvedWorkspaceRoot) {
+    $env:SYMPHONY_WORKSPACE_ROOT = $resolvedWorkspaceRoot.Path
+} else {
+    $env:SYMPHONY_WORKSPACE_ROOT = $workspaceRoot
+}
+$env:SYMPHONY_LOGS_ROOT = $logsRootBase
 $codexPath = Resolve-CodexExecutable
 $gitBashPath = Resolve-GitBashExecutable
 $gitBashDirectory = Split-Path -Parent $gitBashPath
@@ -95,7 +109,7 @@ $env:SYMPHONY_CODEX_PATH = $codexPath.Replace("\", "/")
 
 if ($Mode -eq "all") {
     $powershellPath = (Get-Process -Id $PID).Path
-    $launcherLogs = "D:\GitHub\wire-symphony-logs\launcher"
+    $launcherLogs = Join-Path $logsRootBase "launcher"
     New-Item -ItemType Directory -Force -Path $launcherLogs | Out-Null
 
     $children = foreach ($childMode in @("implement", "investigate", "review")) {
@@ -153,7 +167,7 @@ $port = switch ($Mode) {
     "review" { 4002 }
     default { 4000 }
 }
-$logsRoot = Join-Path "D:\GitHub\wire-symphony-logs" $Mode
+$logsRoot = Join-Path $logsRootBase $Mode
 
 if (-not (Test-Path -LiteralPath $symphonyRoot -PathType Container)) {
     throw "Symphony checkout not found: $symphonyRoot"

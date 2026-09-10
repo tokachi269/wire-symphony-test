@@ -13,10 +13,10 @@ tracker:
 polling:
   interval_ms: 30000
 workspace:
-  root: "D:/GitHub/wire-symphony-investigation-workspaces"
+  root: "$SYMPHONY_WORKSPACE_ROOT"
 hooks:
   after_create: |
-    git clone --no-hardlinks --branch symphony/experiment --single-branch "D:/GitHub/wire-symphony-test" .
+    git clone --no-hardlinks --branch symphony/experiment --single-branch "https://github.com/tokachi269/wire-symphony-test.git" .
     git remote set-url --push origin "disabled://wire-symphony-test"
   timeout_ms: 120000
 agent:
@@ -48,7 +48,7 @@ Descriptionは未記載。
 ## 調査規約
 
 1. 最初に`AGENTS.md`、`docs/architecture.md`、`docs/testing.md`、`docs/engineering/agent_harness.md`、該当domainのarchitectureとoperation semanticsを読む。
-2. production file、test、文書、設定を変更しない。commit、push、deploy、release、本体`D:/GitHub/wire`への変更を行わない。
+2. production file、test、文書、設定を変更しない。commit、push、deploy、release、canonical Wire repositoryへの変更を行わない。
 3. IssueのQuestion、Scope、Out of scopeを境界とし、事実、推論、未確認事項を分ける。
 4. コード、履歴、既存Issue、test ownership、architecture evidenceを調査する。co-changeやhotspotなどのsensorだけから欠陥や必要実装を断定しない。
 5. 強いモデルのsubagentは、複数domainのowner判定、矛盾するevidence、security境界の確認に必要な場合だけread-onlyで使う。常時並列起動しない。

@@ -14,10 +14,10 @@ tracker:
 polling:
   interval_ms: 30000
 workspace:
-  root: "D:/GitHub/wire-symphony-workspaces"
+  root: "$SYMPHONY_WORKSPACE_ROOT"
 hooks:
   after_create: |
-    git clone --no-hardlinks --branch symphony/experiment --single-branch "D:/GitHub/wire-symphony-test" .
+    git clone --no-hardlinks --branch symphony/experiment --single-branch "https://github.com/tokachi269/wire-symphony-test.git" .
     git remote set-url --push origin "https://github.com/tokachi269/wire-symphony-test.git"
   timeout_ms: 120000
 agent:
@@ -55,7 +55,7 @@ Descriptionは未記載。
 4. 変更前に現状、再現条件、既存の共有実装、作業ツリーを確認する。ユーザー所有の差分を上書きまたは削除しない。
 5. 局所修正で足りる場合は局所で直す。同じ意味の再判定、互換分岐、不要な抽象化を増やさない。
 6. 検証は `docs/testing.md` と `docs/command_cheatsheet.md` に従い、変更範囲に見合う最小十分なものを実行する。未実行、失敗、skipを成功として報告しない。
-7. 最初の変更前に `git rev-parse HEAD` を記録する。`symphony/experiment`から`agent/<小文字のIssue identifier>`（例: `agent/gh-1`）を作り、検証済みの作業単位ごとにcommitする。本体 `D:/GitHub/wire` への変更、deploy、releaseは禁止する。
+7. 最初の変更前に `git rev-parse HEAD` を記録する。`symphony/experiment`から`agent/<小文字のIssue identifier>`（例: `agent/gh-1`）を作り、検証済みの作業単位ごとにcommitする。canonical Wire repositoryへの変更、deploy、releaseは禁止する。
 8. 現在のIssue以外を作成、変更、closeしない。調査結果のIssue分解は`agent:investigate` workflowの責務とする。範囲外の改善は最終報告へproposalとして残す。
 
 ## 強いモデルを使う条件

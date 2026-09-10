@@ -13,10 +13,10 @@ tracker:
 polling:
   interval_ms: 30000
 workspace:
-  root: "D:/GitHub/wire-symphony-workspaces"
+  root: "$SYMPHONY_WORKSPACE_ROOT"
 hooks:
   after_create: |
-    git clone --no-hardlinks --branch symphony/experiment --single-branch "D:/GitHub/wire-symphony-test" .
+    git clone --no-hardlinks --branch symphony/experiment --single-branch "https://github.com/tokachi269/wire-symphony-test.git" .
     git remote set-url --push origin "disabled://wire-symphony-test"
   timeout_ms: 120000
 agent:

@@ -1,6 +1,6 @@
 # Symphony sandbox operations
 
-Symphonyは`tokachi269/wire-symphony-test`のIssueだけを監視し、`D:/GitHub/wire`を変更しない。ラベルはモデル名ではなく仕事の種類を表す。具体的なモデル割当はworkflowだけで管理する。
+Symphonyは`tokachi269/wire-symphony-test`のIssueだけを監視し、canonical Wire repositoryを変更しない。ラベルはモデル名ではなく仕事の種類を表す。具体的なモデル割当はworkflowだけで管理する。
 
 ## Routing
 
@@ -19,13 +19,13 @@ Symphonyは`tokachi269/wire-symphony-test`のIssueだけを監視し、`D:/GitHu
 
 モデルはラベルではなく役割で分ける。routine modelは明確なIssueの実装とfocused verificationを担当する。upper modelは曖昧な調査とIssue分解、実装agentが停止条件に当たった診断、commit後の独立review、standalone設計・reviewだけを担当する。通常実装の親agentを途中で上位モデルへ置換せず、必要な局面だけ別セッションのupper-model subagentへ渡す。
 
-既定値は`SYMPHONY_ROUTINE_MODEL=gpt-5.6-luna`（`max`）と`SYMPHONY_UPPER_MODEL=gpt-5.6-sol`（`medium`）である。新モデルへ変更するときはIssueラベルや3つのworkflowを編集せず、起動時の`-RoutineModel`または`-UpperModel`だけを変更する。
+既定値は`SYMPHONY_ROUTINE_MODEL=gpt-5.6-luna`（`max`）と`SYMPHONY_UPPER_MODEL=gpt-5.6-sol`（`medium`）である。launcherは親terminalに残った同名のmodel環境変数を引き継がず、この既定値または明示された起動引数を使う。新モデルへ変更するときはIssueラベルや3つのworkflowを編集せず、起動時の`-RoutineModel`または`-UpperModel`だけを変更する。
 
 調査workflowのfilesystemはread-onlyだが、Symphonyの`github_api`はIssue作成・コメント・ラベル操作に使える。workflowは許可操作を現在の調査Issueとそこから生成するIssueに限定する。ただしこれはagentへの実行契約であり、Symphony本体のREST path allowlistではない。強制境界は、fine-grained tokenをこの実験repoだけに限定し、Contentsをread-only、Issuesをread/writeにすることで作る。
 
 ## Before starting
 
-1. `D:/GitHub/wire-symphony-test`の`WORKFLOW.md`、`WORKFLOW.investigate.md`、`WORKFLOW.review.md`が意図したbranchにあることを確認する。
+1. 実験repoの`WORKFLOW.md`、`WORKFLOW.investigate.md`、`WORKFLOW.review.md`が意図したbranchにあることを確認する。
 2. GitHubのfine-grained tokenをPowerShellの`GITHUB_TOKEN`へ設定する。対象repoは`wire-symphony-test`だけに絞り、Issues、Contents、Pull requestsをread/writeにする。tokenをrepoやworkflowへ書かない。
 3. `codex login status`が成功することを確認する。
 4. GitHub Issueフォームから、調査、単独実装、standalone reviewのいずれか1つを作る。OWNER、MEMBER、COLLABORATORがフォームを送信するとrouting workflowが対応ラベルを自動付与する。外部ユーザーのIssueは自動実行しない。
@@ -35,7 +35,7 @@ Symphonyは`tokachi269/wire-symphony-test`のIssueだけを監視し、`D:/GitHu
 通常運用はPowerShellで次を1回だけ実行する。実装、調査、reviewは別Symphony processだが、このlauncherが同じterminalから3つを起動・監督する。
 
 ```powershell
-Set-Location D:\GitHub\wire-symphony-test
+Set-Location <wire-symphony-test checkout>
 .\tools\start_symphony.ps1 all -AcknowledgePreviewRisk
 ```
 
@@ -52,7 +52,7 @@ Serenaはユーザー環境へ`uv tool install -p 3.13 serena-agent`で導入し
 個別queueの診断時だけ`implement`、`investigate`、`review`を直接指定する。通常の実装後reviewもDraft PR作成後にreview queueが別sessionで行う。
 
 ```powershell
-Set-Location D:\GitHub\wire-symphony-test
+Set-Location <wire-symphony-test checkout>
 .\tools\start_symphony.ps1 review -AcknowledgePreviewRisk
 ```
 
@@ -67,7 +67,7 @@ standalone review queueのdashboardは`http://localhost:4002/`である。
 5. commit後、隔離repoへpushしてDraft PRを作り、`agent:run`と`agent:working`を外して`agent:review`を付ける。PR作成によりCI結果と差分がGitHubから見える。
 6. review queueの別sessionが`docs/engineering/review_policy.md`に従いPR全体をread-onlyでreviewする。
 7. findingがあれば`agent:review`を外して`agent:run`へ戻し、同じbranchとPRを更新する。findingがなければ`agent:ready`となる。
-8. IssueとDraft PRで結果を確認し、採用するcommitだけを本体`D:/GitHub/wire`へcherry-pickする。自動mergeは行わない。
+8. IssueとDraft PRで結果を確認し、採用するcommitだけをcanonical Wire repositoryへcherry-pickする。自動mergeは行わない。
 
 通常のpost-implementation reviewに別Issueは作らない。既存commitの単独auditや実装前設計だけをstandalone review Issueとして登録する。
 
