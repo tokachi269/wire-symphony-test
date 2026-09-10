@@ -43,6 +43,8 @@ Set-Location <wire-symphony-test checkout>
 
 launcherは`codex.exe`をPATHから探し、見つからない場合はCodex appの`%LOCALAPPDATA%\OpenAI\Codex\bin`から最新版を解決して、hidden child processとSymphonyへ絶対パスで渡す。Symphony内部のshellにはWSLの`bash.exe`ではなくGit for Windowsの`bash.exe`を使う。
 
+launcherの既定値は、実験repoの親ディレクトリにある`symphony\elixir`、`wire-symphony-workspaces`、`wire-symphony-logs`である。別の配置では`SYMPHONY_ROOT`、`SYMPHONY_WORKSPACE_ROOT`、`SYMPHONY_LOGS_ROOT`を起動前に設定する。これらはworkflowへ絶対パスを書き込む代わりの実行時設定である。
+
 実装queueだけはCodexの`permissions.symphony-codex` profileを使う。このprofileはworkspace直下とその`.git`だけを書き込み可能にし、GitHub API、git push、必要なlocal bindのためnetworkを許可する。`danger-full-access`は使わない。調査とreview queueはread-only sandboxのままとする。
 
 Serenaはユーザー環境へ`uv tool install -p 3.13 serena-agent`で導入し、`serena setup codex`で`--project-from-cwd`のMCPとして登録する。launcherは`%USERPROFILE%\.local\bin`をPATHへ追加し、Serenaが見つからない場合は起動を止める。review queueだけはMCP引数を`--mode=planning`で上書きし、Serenaの編集toolを無効化する。Serenaがworkspaceに生成する`.serena/`はlocal index/cacheとしてignoreし、PRへ含めない。
