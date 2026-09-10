@@ -160,8 +160,8 @@ Result<junction_corner_resolution> resolve_junction_corner(
   const Vec2d first_origin = scale(first_lateral, first_reach);
   const Vec2d second_origin = scale(second_lateral, second_reach);
   const Vec2d delta = subtract(second_origin, first_origin);
-  const double first_sharp_m = cross(delta, second.tangent) / sine;
-  const double second_sharp_m = cross(delta, first.tangent) / sine;
+  const double first_sharp_m = cross(delta, second_direction) / sine;
+  const double second_sharp_m = cross(delta, first_direction) / sine;
   if (!is_finite(first_sharp_m) || !is_finite(second_sharp_m)) {
     return Out::Fail(CommitFailureCategory::kNotImplemented,
                      "road junction side-line intersection is not finite");

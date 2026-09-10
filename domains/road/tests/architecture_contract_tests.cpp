@@ -1171,17 +1171,34 @@ bool same_angle_approaches_use_id_tie_break(std::string& failure) {
   const ResolvedConnection* decision = FindResolvedConnection(state.derived(), shared);
   ROAD_CONTRACT_EXPECT(decision != nullptr && decision->ordered_approaches.size() == 3,
                        "same-angle junction decision is missing");
+  const ApproachKey upper_key{shared, upper.value, EndpointRole::kStart};
+  const ApproachKey lower_key{shared, lower.value, EndpointRole::kStart};
   const auto upper_position =
       std::find(decision->ordered_approaches.begin(), decision->ordered_approaches.end(),
-                ApproachKey{shared, upper.value, EndpointRole::kStart});
+                upper_key);
   const auto lower_position =
       std::find(decision->ordered_approaches.begin(), decision->ordered_approaches.end(),
-                ApproachKey{shared, lower.value, EndpointRole::kStart});
+                lower_key);
   ROAD_CONTRACT_EXPECT(upper_position != decision->ordered_approaches.end() &&
                            lower_position != decision->ordered_approaches.end(),
                        "same-angle approaches are absent from the order");
   ROAD_CONTRACT_EXPECT((upper.value < lower.value) == (upper_position < lower_position),
                        "same-angle approaches are not tie-broken by stable ID");
+  const ResolvedApproach* upper_approach =
+      FindResolvedApproach(state.derived(), upper_key);
+  const ResolvedApproach* lower_approach =
+      FindResolvedApproach(state.derived(), lower_key);
+  // The two road-body chords meet at 90 degrees. Their 10 m symmetric
+  // sections intersect 5 m along each chord, then the 4 m corner radius adds
+  // 4 m / tan(45 degrees), so both gates must be exactly 9 m from the node.
+  constexpr double expected_same_angle_setback_m = 9.0;
+  ROAD_CONTRACT_EXPECT(
+      upper_approach != nullptr && lower_approach != nullptr &&
+          std::abs(upper_approach->auto_setback_m -
+                   expected_same_angle_setback_m) < 1e-9 &&
+          std::abs(lower_approach->auto_setback_m -
+                   expected_same_angle_setback_m) < 1e-9,
+      "same-angle chord fallback did not preserve the side-line intersection");
   const auto saved = state.Save();
   const auto loaded = saved.ok ? RoadState::Load(saved.value) : Result<RoadState>{};
   ROAD_CONTRACT_EXPECT(loaded.ok, "same-angle state did not round-trip");
