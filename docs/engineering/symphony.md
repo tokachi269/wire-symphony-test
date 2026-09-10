@@ -80,6 +80,15 @@ standalone review queueのdashboardは`http://localhost:4002/`である。
 
 最初の20 Issueでは、Issueごとにroutine/upper model token、decisionの有無、reviewの有無、review findingの有無、修正round数、CI結果、最終採否を記録する。20件は成功目標ではなくrouting境界を調整する標本である。特に`review findingなし`が続くIssue familyは次回からreview対象外候補とし、Luna失敗後にSolへ渡る回数が多いfamilyは事前decision対象へ寄せる。
 
+各queueはsession終了時にIssue単位のtoken、実行時間、turn数を`Trial usage`としてlogへ残す。集計はrepository相対の既定log rootを使って次を実行する。CSVを保存する場合だけ`-OutputPath`を指定する。
+
+```powershell
+.\tools\export_symphony_trial_metrics.ps1
+.\tools\export_symphony_trial_metrics.ps1 -OutputPath .\symphony-trial.csv
+```
+
+このlogで分かるのはqueue sessionごとの消費量である。decision有無、review finding、CI結果、最終採否はIssueのlabel、コメント、PRから同じIdentifierへ結合する。token量だけで品質を判定しない。
+
 通常のpost-implementation reviewに別Issueは作らない。既存commitの単独auditや実装前設計だけをstandalone review Issueとして登録する。
 
 ## Failure handling
