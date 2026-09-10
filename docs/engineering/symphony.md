@@ -7,13 +7,17 @@ Symphonyは`tokachi269/wire-symphony-test`のIssueだけを監視し、`D:/GitHu
 | Label | Model | Purpose | Write access | Max turns |
 |---|---|---|---|---:|
 | `agent:run` | none | dispatch gate paired with `agent:implement` | follows implementation workflow | none |
-| `agent:implement` | `gpt-5.6-luna` / `max` | scoped implementation, verification, independent review | isolated workspace only | 10 |
-| `agent:investigate` | `gpt-5.6-luna` / `max` | read-only repository investigation and evidence-based Issue decomposition | repository read-only; scoped Issue writes | 4 |
+| `agent:implement` | routine model (`gpt-5.6-luna` / `max` initially) | scoped implementation and verification | isolated workspace only | 10 |
+| `agent:investigate` | upper model (`gpt-5.6-sol` / `medium` initially) | read-only repository investigation and evidence-based Issue decomposition | repository read-only; scoped Issue writes | 4 |
 | `agent:proposed` | none | generated Issue requiring a decision or dependency resolution | none | none |
-| `agent:review` | configured review model (`gpt-5.6-sol` / `high` initially) | standalone design or review | read-only | 2 |
+| `agent:review` | upper model (`gpt-5.6-sol` / `medium` initially) | standalone design or review | read-only | 2 |
 | `agent:blocked` | none | operator attention; never dispatches | none | none |
 
-実装queueでは`agent:run`と`agent:implement`を組み合わせる。調査は`agent:investigate`だけでread-only実行する。実装Issueは原則として新Issueを作らず、調査workflowだけが根拠に基づくIssue分解を担当する。強いモデルのsubagentは定義済みの停止条件に当たった診断、複雑な調査判断、commit後の独立reviewに限定する。review modelを変更するときはIssueラベルではなくworkflowの1か所だけを更新する。
+実装queueでは`agent:run`と`agent:implement`を組み合わせる。調査は`agent:investigate`だけでread-only実行する。実装Issueは原則として新Issueを作らず、調査workflowだけが根拠に基づくIssue分解を担当する。
+
+モデルはラベルではなく役割で分ける。routine modelは明確なIssueの実装とfocused verificationを担当する。upper modelは曖昧な調査とIssue分解、実装agentが停止条件に当たった診断、commit後の独立review、standalone設計・reviewだけを担当する。通常実装の親agentを途中で上位モデルへ置換せず、必要な局面だけ別セッションのupper-model subagentへ渡す。
+
+既定値は`SYMPHONY_ROUTINE_MODEL=gpt-5.6-luna`（`max`）と`SYMPHONY_UPPER_MODEL=gpt-5.6-sol`（`medium`）である。新モデルへ変更するときはIssueラベルや3つのworkflowを編集せず、起動時の`-RoutineModel`または`-UpperModel`だけを変更する。
 
 調査workflowのfilesystemはread-onlyだが、Symphonyの`github_api`はIssue作成・コメント・ラベル操作に使える。workflowは許可操作を現在の調査Issueとそこから生成するIssueに限定する。ただしこれはagentへの実行契約であり、Symphony本体のREST path allowlistではない。強制境界は、fine-grained tokenをこの実験repoだけに限定し、Contentsをread-only、Issuesをread/writeにすることで作る。
 
@@ -26,28 +30,25 @@ Symphonyは`tokachi269/wire-symphony-test`のIssueだけを監視し、`D:/GitHu
 
 ## Start
 
-通常実装はPowerShellで次を実行する。
+通常運用はPowerShellで次を1回だけ実行する。実装queueと調査queueは別Symphony processである必要があるが、このlauncherが同じterminalから両方を起動・監督する。
 
 ```powershell
 Set-Location D:\GitHub\wire-symphony-test
-.\tools\start_symphony.ps1 implement
+.\tools\start_symphony.ps1 all
 ```
 
-調査queueは別terminalで起動する。
+terminalを開いたままにし、停止時は`Ctrl+C`を押す。dashboardは実装queueが`http://localhost:4000/`、調査queueが`http://localhost:4001/`である。
 
-```powershell
-Set-Location D:\GitHub\wire-symphony-test
-.\tools\start_symphony.ps1 investigate
-```
+モデルを更新するときは、起動時の`-UpperModel <model-id>`または`-RoutineModel <model-id>`だけを変える。
 
-standalone reviewは必要なときだけ起動する。通常の実装後reviewは実装agentが別セッションのsubagentを起動するため、こちらを起動する必要はない。
+個別queueの診断時だけ`implement`または`investigate`を直接指定する。standalone reviewは必要なときだけ別途起動する。通常の実装後reviewは実装agentがupper-model subagentを別セッションで起動するため、review queueを常時起動する必要はない。
 
 ```powershell
 Set-Location D:\GitHub\wire-symphony-test
 .\tools\start_symphony.ps1 review
 ```
 
-dashboardは実装queueが`http://localhost:4000/`、調査queueが`http://localhost:4001/`、standalone review queueが`http://localhost:4002/`である。
+standalone review queueのdashboardは`http://localhost:4002/`である。
 
 ## Issue lifecycle
 

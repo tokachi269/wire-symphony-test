@@ -24,7 +24,7 @@ agent:
   max_turns: 4
   max_retry_backoff_ms: 300000
 codex:
-  command: "codex --model gpt-5.6-luna --config model_reasoning_effort=max --config agents.max_concurrent_threads_per_session=2 --config agents.default_subagent_model=gpt-5.6-sol --config agents.default_subagent_reasoning_effort=high --config shell_environment_policy.inherit=all app-server"
+  command: "codex --model ${SYMPHONY_UPPER_MODEL:-gpt-5.6-sol} --config model_reasoning_effort=${SYMPHONY_UPPER_EFFORT:-medium} --config agents.max_concurrent_threads_per_session=2 --config agents.default_subagent_model=${SYMPHONY_UPPER_MODEL:-gpt-5.6-sol} --config agents.default_subagent_reasoning_effort=${SYMPHONY_UPPER_EFFORT:-medium} --config shell_environment_policy.inherit=all app-server"
   approval_policy:
     reject:
       sandbox_approval: true
