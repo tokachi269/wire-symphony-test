@@ -13,7 +13,7 @@ tracker:
 polling:
   interval_ms: 30000
 workspace:
-  root: "D:/GitHub/wire-symphony-review-workspaces"
+  root: "D:/GitHub/wire-symphony-workspaces"
 hooks:
   after_create: |
     git clone --no-hardlinks --branch symphony/experiment --single-branch "D:/GitHub/wire-symphony-test" .
@@ -34,7 +34,7 @@ codex:
   stall_timeout_ms: 300000
 ---
 
-GitHub Issue `{{ issue.identifier }}` の設計検討または独立レビューだけを行う。
+GitHub Issue `{{ issue.identifier }}` の設計検討またはDraft PR独立レビューだけを行う。
 
 Title: {{ issue.title }}
 
@@ -47,12 +47,12 @@ Descriptionは未記載。
 
 ## 制約
 
-1. 最初に `AGENTS.md`、`docs/engineering/review_policy.md`、Issueが指定する正本文書・差分・commitを読む。
+1. 最初に `AGENTS.md`、`docs/engineering/review_policy.md`、Issueと紐付くDraft PR、指定された正本文書を読む。実装workspaceが存在する場合はそのbaseからHEADまでの完全なdiffを直接確認する。
 2. ファイル変更、commit、push、deploy、releaseは禁止する。調査と評価だけを行う。
 3. Issueの問いに直接答え、事実、推論、未確認事項を分ける。範囲外の再設計を提案しない。
 4. 設計依頼では、決定事項、未決定事項、owner、影響範囲、受け入れ条件、実装Issueへ渡す具体的な指示をまとめる。
-5. レビュー依頼では `docs/engineering/review_policy.md` に従い、重大度順のfindingsをファイルと根拠つきで示す。問題がなければ、確認した範囲と残るriskを明記する。
+5. レビュー依頼では `docs/engineering/review_policy.md` に従い、PR全体を重大度順のfindingsとして示す。問題がなければ、確認したdiff、検証、残るriskを明記する。
 
 ## 完了報告
 
-GitHub操作が利用できる場合、結果を現在のIssueへ1回だけ記録し、再実行を止めるため `agent:review` ラベルを外す。判断不能の場合は `agent:blocked` を付ける。Issueはcloseしない。ほかのIssue、PR、ラベルには触れない。
+結果をDraft PRと現在のIssueへ1回ずつ記録する。actionable findingがある場合は`agent:review`を外してから`agent:run`を付け、同じworkspaceを実装queueへ戻す。findingがない場合は`agent:review`を外して`agent:ready`を付ける。判断不能の場合は`agent:review`を外して`agent:blocked`を付ける。Issueはcloseせず、PRをready化またはmergeしない。ほかのIssue、PR、ラベルには触れない。

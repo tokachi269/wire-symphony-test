@@ -1,5 +1,5 @@
 name: Agent implementation
-description: 隔離workspaceで実装・検証・独立レビューまで実行する
+description: 隔離workspaceで実装・検証し、Draft PRを独立レビューへ渡す
 title: "[Agent implement] "
 labels: []
 body:
@@ -29,7 +29,7 @@ body:
       placeholder: |
         - [ ] focused testがfail-firstからpassになる
         - [ ] 関連する既存testがpassする
-        - [ ] local commitが作成される
+        - [ ] Draft PRが作成され、独立レビューへ渡される
     validations:
       required: true
   - type: textarea

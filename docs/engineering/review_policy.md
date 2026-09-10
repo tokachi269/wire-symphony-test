@@ -6,7 +6,7 @@
 
 - 実装を行った親agentとは別セッションでreviewする。
 - reviewerはread-onlyとし、ファイル変更、commit、Issue操作を行わない。
-- 実装者の説明だけでなく、Issue、変更前base commit、完全なdiff、現在のHEAD、検証出力を直接確認する。
+- 実装者の説明だけでなく、Issue、Draft PR、変更前base commit、完全なdiff、現在のHEAD、検証出力を直接確認する。
 - 通常reviewは実装会話を参照してよい。architecture、security、persistence、外部入力、権限境界を変える場合は、可能なら実装理由を先に与えずdiffと正本文書から確認する。
 
 ## Review order
@@ -34,4 +34,4 @@ styleだけの指摘は、bug、誤解、責務逸脱を生む場合を除いて
 
 ## Completion
 
-親agentはactionable findingを修正し、focused verificationとlocal commitを更新してから同じreviewerへ再確認を依頼する。reviewerを起動できない、review対象を特定できない、またはfindingを解消できない場合は完了とせずblockedとする。
+actionable findingがあればIssueを実装queueへ戻し、同じworkspaceとPR branchで修正、focused verification、commit、pushを行う。更新後は別sessionのreview queueがPR全体を再確認する。reviewerを起動できない、review対象を特定できない、またはfindingを解消できない場合は完了とせずblockedとする。

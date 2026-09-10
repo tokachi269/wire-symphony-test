@@ -18,19 +18,16 @@ workspace:
 hooks:
   after_create: |
     git clone --no-hardlinks --branch symphony/experiment --single-branch "D:/GitHub/wire-symphony-test" .
-    git remote set-url --push origin "disabled://wire-symphony-test"
+    git remote set-url --push origin "https://github.com/tokachi269/wire-symphony-test.git"
   timeout_ms: 120000
 agent:
   max_concurrent_agents: 1
-  max_turns: 10
+  max_turns: 3
   max_retry_backoff_ms: 300000
 codex:
   command: '"${SYMPHONY_CODEX_PATH:-codex}" --model ${SYMPHONY_ROUTINE_MODEL:-gpt-5.6-luna} --config model_reasoning_effort=${SYMPHONY_ROUTINE_EFFORT:-max} --config agents.max_concurrent_threads_per_session=2 --config agents.default_subagent_model=${SYMPHONY_UPPER_MODEL:-gpt-5.6-sol} --config agents.default_subagent_reasoning_effort=${SYMPHONY_UPPER_EFFORT:-medium} --config shell_environment_policy.inherit=all app-server'
   approval_policy: never
-  thread_sandbox: workspace-write
-  turn_sandbox_policy:
-    type: workspaceWrite
-    networkAccess: true
+  permissions_profile: symphony-codex
   turn_timeout_ms: 3600000
   stall_timeout_ms: 300000
 ---
@@ -58,7 +55,7 @@ Descriptionは未記載。
 4. 変更前に現状、再現条件、既存の共有実装、作業ツリーを確認する。ユーザー所有の差分を上書きまたは削除しない。
 5. 局所修正で足りる場合は局所で直す。同じ意味の再判定、互換分岐、不要な抽象化を増やさない。
 6. 検証は `docs/testing.md` と `docs/command_cheatsheet.md` に従い、変更範囲に見合う最小十分なものを実行する。未実行、失敗、skipを成功として報告しない。
-7. 最初の変更前に `git rev-parse HEAD` を記録する。検証済みの作業単位ごとにlocal commitを作る。push、deploy、release、本体 `D:/GitHub/wire` への変更は禁止する。
+7. 最初の変更前に `git rev-parse HEAD` を記録する。`symphony/experiment`から`agent/<小文字のIssue identifier>`（例: `agent/gh-1`）を作り、検証済みの作業単位ごとにcommitする。本体 `D:/GitHub/wire` への変更、deploy、releaseは禁止する。
 8. 現在のIssue以外を作成、変更、closeしない。調査結果のIssue分解は`agent:investigate` workflowの責務とする。範囲外の改善は最終報告へproposalとして残す。
 
 ## 強いモデルを使う条件
@@ -73,19 +70,17 @@ Descriptionは未記載。
 
 subagentの結果は提案として扱い、親agentが根拠を確認してから実装する。診断後も安全に進められない場合は変更を増やさずblockedとする。
 
-## 必須の独立レビュー
+## Draft PRと独立レビューへの引き渡し
 
-実装とfocused verificationを完了してlocal commitを作った後、`docs/engineering/review_policy.md`を入力契約として、別セッションのreviewer subagentを必ず1つ起動する。
+実装とfocused verificationを完了してcommitを作った後、隔離repoへ現在の`agent/*` branchをpushする。続いて`github_api`でbaseを`symphony/experiment`、headを現在branchとするDraft PRを1件だけ作る。既存PRがある再試行では重複作成せず、そのPRを更新する。
 
-- reviewerはread-onlyとし、ファイル変更、commit、Issue操作を禁止する。
-- 変更前に記録したbase commitから現在のHEADまでの完全なdiff、Issueのacceptance criteria、実行済み検証を渡す。
-- reviewerには重大度順のfindingsを要求する。各findingは該当箇所、破綻する条件、根拠、必要な修正または検証を含める。
-- reviewerがfindingを返した場合、親agentが修正・検証・commitし、同じreviewerへ完全な更新diffの再レビューを依頼する。
-- actionable findingが残っている間は完了扱いにしない。reviewerを起動できない、結果を取得できない、またはreview対象を特定できない場合はblockedとする。
-- reviewが通る前に実行ラベルを外さない。
+- PR本文へIssue、base commit、head commit、実行した検証と結果、未確認riskを書く。
+- Draft PR作成後、IssueへPR URLと検証要約をコメントする。
+- `agent:run`と`agent:working`を外してから`agent:review`を付け、別のupper-model review queueへ引き渡す。
+- pushまたはDraft PR作成に失敗した場合は`agent:blocked`を付け、失敗箇所をIssueへ記録する。review済みとして扱わない。
 
 ## 完了報告
 
-最終報告には、観測したこと、変更内容、検証結果、commit hash、残る不確実性またはblockerを簡潔に含める。
+最終報告には、観測したこと、変更内容、検証結果、commit hash、Draft PR URL、残る不確実性またはblockerを簡潔に含める。この実装sessionはDraft PRと`agent:review`への引き渡しで終了し、review完了とは主張しない。
 
-GitHub操作が利用できる場合、完了またはblockedの要約を現在のIssueへ1回だけ記録し、再実行を止めるため `agent:run` ラベルを外す。blockedの場合はさらに `agent:blocked` を付ける。Issueはcloseしない。ほかのIssue、PR、ラベルには触れない。
+作業開始時に`github_api`で現在のIssueへ`agent:working`を付ける。GitHub操作は現在のIssue、そのIssue用のbranchとDraft PRだけに限定する。Issueはcloseせず、PRはmergeしない。

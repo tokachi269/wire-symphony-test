@@ -51,7 +51,7 @@ function Resolve-GitBashExecutable {
 }
 
 if ([string]::IsNullOrWhiteSpace($env:GITHUB_TOKEN)) {
-    throw "GITHUB_TOKEN is required. Use a repo-scoped fine-grained token with Issues read/write permission."
+    throw "GITHUB_TOKEN is required. Use a repo-scoped fine-grained token with Issues, Contents, and Pull requests read/write permission."
 }
 if (-not $AcknowledgePreviewRisk) {
     throw "Symphony requires explicit acknowledgement that this engineering preview runs without the usual guardrails. Re-run with -AcknowledgePreviewRisk."
@@ -82,6 +82,15 @@ $codexPath = Resolve-CodexExecutable
 $gitBashPath = Resolve-GitBashExecutable
 $gitBashDirectory = Split-Path -Parent $gitBashPath
 $env:PATH = "$gitBashDirectory;$env:PATH"
+$serenaBin = Join-Path $env:USERPROFILE ".local\bin"
+if (Test-Path -LiteralPath $serenaBin -PathType Container) {
+    $env:PATH = "$serenaBin;$env:PATH"
+}
+if (-not (Get-Command serena -ErrorAction SilentlyContinue)) {
+    throw "Serena is not available. Install it with: uv tool install -p 3.13 serena-agent"
+}
+$env:GIT_TERMINAL_PROMPT = "0"
+$env:GCM_INTERACTIVE = "Never"
 $env:SYMPHONY_CODEX_PATH = $codexPath.Replace("\", "/")
 
 if ($Mode -eq "all") {
@@ -89,7 +98,7 @@ if ($Mode -eq "all") {
     $launcherLogs = "D:\GitHub\wire-symphony-logs\launcher"
     New-Item -ItemType Directory -Force -Path $launcherLogs | Out-Null
 
-    $children = foreach ($childMode in @("implement", "investigate")) {
+    $children = foreach ($childMode in @("implement", "investigate", "review")) {
         $stdout = Join-Path $launcherLogs "$childMode.stdout.log"
         $stderr = Join-Path $launcherLogs "$childMode.stderr.log"
         $process = Start-Process `
@@ -105,12 +114,12 @@ if ($Mode -eq "all") {
         }
     }
 
-    Write-Host "Symphony implement and investigation queues started."
+    Write-Host "Symphony implement, investigation, and review queues started."
     Write-Host "Routine model: $env:SYMPHONY_ROUTINE_MODEL ($env:SYMPHONY_ROUTINE_EFFORT)"
     Write-Host "Upper model:   $env:SYMPHONY_UPPER_MODEL ($env:SYMPHONY_UPPER_EFFORT)"
-    Write-Host "Dashboards: http://localhost:4000/ and http://localhost:4001/"
+    Write-Host "Dashboards: http://localhost:4000/, http://localhost:4001/, and http://localhost:4002/"
     Write-Host "Logs: $launcherLogs"
-    Write-Host "Keep this terminal open. Press Ctrl+C to stop both queues."
+    Write-Host "Keep this terminal open. Press Ctrl+C to stop all queues."
 
     try {
         while ($true) {
