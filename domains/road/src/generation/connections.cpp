@@ -95,11 +95,12 @@ endpoint_side_reaches endpoint_reaches(const SavedRoadGraph &graph,
 double signed_endpoint_reach_toward(const SavedRoadGraph &graph,
                                     const RoadSegment &segment,
                                     const ordered_approach &from,
-                                    const ordered_approach &toward) {
+                                    Vec2d from_direction,
+                                    Vec2d toward_direction) {
   const endpoint_side_reaches reaches =
       endpoint_reaches(graph, segment, from.key);
-  return cross(from.tangent, toward.tangent) > 0.0 ? reaches.left_m
-                                                   : -reaches.right_m;
+  return cross(from_direction, toward_direction) > 0.0 ? reaches.left_m
+                                                        : -reaches.right_m;
 }
 
 struct junction_corner_resolution {
@@ -135,17 +136,27 @@ Result<junction_corner_resolution> resolve_junction_corner(
   resolved.corner.radius_m =
       std::min(first_segment->corner_radius_m, second_segment->corner_radius_m);
 
-  const double sine = cross(first.tangent, second.tangent);
+  Vec2d first_direction = first.tangent;
+  Vec2d second_direction = second.tangent;
+  double sine = cross(first_direction, second_direction);
   if (std::abs(sine) <= rules.parallel_sine_tolerance) {
-    return Out::Ok(resolved);
+    const double chord_sine = cross(first.chord, second.chord);
+    if (std::abs(chord_sine) <= rules.parallel_sine_tolerance) {
+      return Out::Ok(resolved);
+    }
+    first_direction = first.chord;
+    second_direction = second.chord;
+    sine = chord_sine;
   }
 
-  const Vec2d first_lateral{-first.tangent.y, first.tangent.x};
-  const Vec2d second_lateral{-second.tangent.y, second.tangent.x};
+  const Vec2d first_lateral{-first_direction.y, first_direction.x};
+  const Vec2d second_lateral{-second_direction.y, second_direction.x};
   const double first_reach =
-      signed_endpoint_reach_toward(graph, *first_segment, first, second);
+      signed_endpoint_reach_toward(graph, *first_segment, first,
+                                   first_direction, second_direction);
   const double second_reach =
-      signed_endpoint_reach_toward(graph, *second_segment, second, first);
+      signed_endpoint_reach_toward(graph, *second_segment, second,
+                                   second_direction, first_direction);
   const Vec2d first_origin = scale(first_lateral, first_reach);
   const Vec2d second_origin = scale(second_lateral, second_reach);
   const Vec2d delta = subtract(second_origin, first_origin);
@@ -157,7 +168,7 @@ Result<junction_corner_resolution> resolve_junction_corner(
   }
 
   const double angle = std::acos(std::clamp(
-      dot(first.tangent, second.tangent), -1.0, 1.0));
+      dot(first_direction, second_direction), -1.0, 1.0));
   const double half_angle_tangent = std::tan(angle * 0.5);
   if (half_angle_tangent <= rules.parallel_sine_tolerance) {
     return Out::Fail(CommitFailureCategory::kNotImplemented,
