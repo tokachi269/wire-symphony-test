@@ -50,7 +50,9 @@ Result<RoadFrame> road_frame_at(const DerivedSegment& segment,
       EvaluatePath(segment.alignment, segment_distance_m);
   const Result<Vec2d> horizontal_tangent =
       internal::tangent_at(segment.alignment, segment_distance_m);
-  if (!center.ok || !horizontal_tangent.ok) {
+  const Result<Vec2d> horizontal_lateral =
+      internal::lateral_at(segment.alignment, segment_distance_m);
+  if (!center.ok || !horizontal_tangent.ok || !horizontal_lateral.ok) {
     return Result<RoadFrame>::Fail(
         CommitFailureCategory::kInternalError,
         "road vertical frame alignment sample is missing");
@@ -67,8 +69,8 @@ Result<RoadFrame> road_frame_at(const DerivedSegment& segment,
   frame.tangent =
       normalize3(Vec3d{horizontal_tangent.value.x, horizontal_tangent.value.y,
                        grade});
-  frame.lateral = Vec3d{-horizontal_tangent.value.y, horizontal_tangent.value.x,
-                        0.0};
+  frame.lateral = Vec3d{horizontal_lateral.value.x,
+                        horizontal_lateral.value.y, 0.0};
   frame.normal = normalize3(cross3(frame.tangent, frame.lateral));
   if (length3(frame.tangent) <= internal::distance_epsilon ||
       length3(frame.lateral) <= internal::distance_epsilon ||
